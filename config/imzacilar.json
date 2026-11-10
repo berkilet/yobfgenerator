@@ -1,0 +1,18 @@
+{
+  "_aciklama": "UYGUNDUR bloğundaki imzacılar ve 'İmzasına Sunulacak Yetkili' adayları. Unvanlar kanonik haldir; forma her zaman buradan yazılır. Örnek formlardan çıkarılmıştır, güncel unvanlar kullanıcı tarafından teyit edilmelidir.",
+  "imzacilar": [
+    { "id": "gsumer",   "ad": "Av. Gökhan SÜMER",  "unvan": "Kalyon Holding Baş Hukuk Müşaviri", "unvan_en": "Kalyon Holding Chief Legal Counsel" },
+    { "id": "fkolmek",  "ad": "Dr. Fatih KÖLMEK",  "unvan": "Kalyon Enerji CEO",                  "unvan_en": "Kalyon Enerji CEO" },
+    { "id": "takbulut", "ad": "Tuğbay AKBULUT",    "unvan": "Genel Müdür Yardımcısı – Finans / CFO", "unvan_en": "Deputy General Manager – Finance / CFO" },
+    { "id": "gduman",   "ad": "Gürler DUMAN",      "unvan": "Genel Müdür Yardımcısı – Operasyonlar", "unvan_en": "Deputy General Manager – Operations" },
+    { "id": "bulker",   "ad": "Beyhan ÜLKER",      "unvan": "İş Geliştirme Genel Müdür Yardımcısı", "unvan_en": "Deputy General Manager – Business Development" },
+    { "id": "myagci",   "ad": "Murat YAĞCI",       "unvan": "Kıdemli HESS-Q Müdürü",             "unvan_en": "Senior HESS-Q Manager" },
+    { "id": "dtuncel",  "ad": "Duran TUNCEL",      "unvan": "Proje Müdürü",                       "unvan_en": "Project Manager" }
+  ],
+  "imzasina_sunulacak_yetkililer": [
+    "Sn. Haluk KALYONCU",
+    "Sn. Murathan KALYONCU",
+    "Sn. Mustafa KOÇAR",
+    "Sn. Fatih KÖLMEK"
+  ]
+}

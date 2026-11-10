@@ -1,0 +1,550 @@
+package legal.erk.yobf.render;
+
+import legal.erk.yobf.config.Ayarlar;
+import legal.erk.yobf.config.Imzaci;
+import legal.erk.yobf.model.Bedel;
+import legal.erk.yobf.model.FormVerisi;
+import legal.erk.yobf.model.SozlesmeGrubu;
+import org.apache.poi.util.Units;
+import org.apache.poi.xwpf.usermodel.Borders;
+import org.apache.poi.xwpf.usermodel.Document;
+import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
+import org.apache.poi.xwpf.usermodel.TableRowAlign;
+import org.apache.poi.xwpf.usermodel.TableWidthType;
+import org.apache.poi.xwpf.usermodel.UnderlinePatterns;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.poi.xwpf.usermodel.XWPFStyles;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableCell;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBorder;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTFonts;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageBorders;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageSz;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTStyles;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblBorders;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblGrid;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblPr;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STPageBorderOffset;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTblLayoutType;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
+/**
+ * CLAUDE.md §9 — Apache POI ile .docx üretimi.
+ * A4, dar kenar boşlukları, kalın siyah çerçeve (sayfa kenarlığı), Cambria;
+ * iki sütunlu (etiket : değer) tablo ve UYGUNDUR imza bloğu (1–5 + 1).
+ */
+public final class FormYazici {
+
+    // Ölçüler (twip = 1/20 pt)
+    static final int A4_GEN = 11906, A4_YUK = 16838;
+    static final int KENAR_YAN = 1000, KENAR_UST = 850, KENAR_ALT = 850;
+    static final int ICERIK = A4_GEN - 2 * KENAR_YAN;
+    static final int ETIKET_SUTUN = Math.round(ICERIK * 0.28f);
+    static final int AYRAC_SUTUN = 280;
+    static final int DEGER_SUTUN = ICERIK - ETIKET_SUTUN - AYRAC_SUTUN;
+    static final double LOGO_YUKSEKLIK_CM = 2.2;
+
+    static final String FONT = "Cambria";
+    static final int GOVDE = 11, ACIKLAMA = 9, BASLIK = 14;
+
+    private static final Map<String, String> BELGE_TURU_EN = Map.ofEntries(
+            Map.entry("Sözleşme", "Agreement"),
+            Map.entry("Zeyilname", "Amendment"),
+            Map.entry("Protokol", "Protocol"),
+            Map.entry("Gizlilik Sözleşmesi", "Non-Disclosure Agreement"),
+            Map.entry("Variation Order", "Variation Order"),
+            Map.entry("Yönetim Kurulu Kararı", "Board of Directors Resolution"),
+            Map.entry("Avukatlık Ücret Sözleşmesi", "Attorney Fee Agreement"),
+            Map.entry("Vekaletname", "Power of Attorney"),
+            Map.entry("Azilnameler", "Revocation of Power of Attorney"),
+            Map.entry("Azilname", "Revocation of Power of Attorney"),
+            Map.entry("Diğer", "Other"));
+
+    private static final Map<String, String> BEDEL_ETIKETI_EN = Map.of(
+            "Bedel", "Price",
+            "Sözleşme Bedeli", "Contract Price",
+            "Zeyilnameye Konu Tutar", "Amendment Amount");
+
+    private final Ayarlar ayarlar;
+
+    public FormYazici(Ayarlar ayarlar) {
+        this.ayarlar = ayarlar;
+    }
+
+    // ------------------------------------------------------------------ giriş
+
+    public void yaz(FormVerisi f, Path cikti) throws IOException {
+        Files.createDirectories(cikti.toAbsolutePath().getParent());
+        try (OutputStream out = Files.newOutputStream(cikti)) {
+            yaz(f, out);
+        }
+    }
+
+    public void yaz(FormVerisi f, OutputStream out) throws IOException {
+        try (XWPFDocument doc = new XWPFDocument()) {
+            varsayilanYaziTipi(doc);
+            sayfaDuzeni(doc);
+            logo(doc, f.logo);
+            baslik(doc, f);
+            anaTablo(doc, f);
+            imzaBlogu(doc, f);
+            doc.write(out);
+        }
+    }
+
+    /** YOBF_<BelgeTürü>_<KarşıTaraf>_<GGAAYYYY>.docx */
+    public static String dosyaAdi(FormVerisi f, Predicate<String> grupSirketiMi, java.time.LocalDate tarih) {
+        String karsi = f.ilkTaraf(grupSirketiMi);
+        String[] kelimeler = legal.erk.yobf.rules.UnvanNormalizer.parantezsiz(karsi).split("\\s+");
+        StringBuilder k = new StringBuilder();
+        for (int i = 0; i < Math.min(3, kelimeler.length); i++) k.append(kelimeler[i]);
+        return "YOBF_" + temizle(f.belgeTuru) + "_" + temizle(k.toString()) + "_"
+                + legal.erk.yobf.rules.TarihKontrol.dosyaAdiTarihi(tarih) + ".docx";
+    }
+
+    static String temizle(String s) {
+        if (s == null || s.isBlank()) return "Belge";
+        String t = s.replaceAll("[\\\\/:*?\"<>|.,;'’()&]", "").replaceAll("\\s+", "");
+        return t.isEmpty() ? "Belge" : t;
+    }
+
+    // ------------------------------------------------------------------ belge düzeni
+
+    private static void varsayilanYaziTipi(XWPFDocument doc) {
+        XWPFStyles styles = doc.createStyles();
+        CTStyles ct = CTStyles.Factory.newInstance();
+        CTRPr rpr = ct.addNewDocDefaults().addNewRPrDefault().addNewRPr();
+        CTFonts fonts = rpr.addNewRFonts();
+        fonts.setAscii(FONT);
+        fonts.setHAnsi(FONT);
+        fonts.setCs(FONT);
+        fonts.setEastAsia(FONT);
+        rpr.addNewSz().setVal(BigInteger.valueOf(GOVDE * 2L));
+        rpr.addNewSzCs().setVal(BigInteger.valueOf(GOVDE * 2L));
+        rpr.addNewLang().setVal("tr-TR");
+        var ppr = ct.getDocDefaults().addNewPPrDefault().addNewPPr();
+        var sp = ppr.addNewSpacing();
+        sp.setAfter(BigInteger.ZERO);
+        sp.setBefore(BigInteger.ZERO);
+        sp.setLine(BigInteger.valueOf(240));
+        sp.setLineRule(org.openxmlformats.schemas.wordprocessingml.x2006.main.STLineSpacingRule.AUTO);
+        styles.setStyles(ct);
+    }
+
+    private static void sayfaDuzeni(XWPFDocument doc) {
+        CTSectPr s = doc.getDocument().getBody().isSetSectPr()
+                ? doc.getDocument().getBody().getSectPr()
+                : doc.getDocument().getBody().addNewSectPr();
+        CTPageSz sz = s.isSetPgSz() ? s.getPgSz() : s.addNewPgSz();
+        sz.setW(BigInteger.valueOf(A4_GEN));
+        sz.setH(BigInteger.valueOf(A4_YUK));
+        CTPageMar m = s.isSetPgMar() ? s.getPgMar() : s.addNewPgMar();
+        m.setTop(BigInteger.valueOf(KENAR_UST));
+        m.setBottom(BigInteger.valueOf(KENAR_ALT));
+        m.setLeft(BigInteger.valueOf(KENAR_YAN));
+        m.setRight(BigInteger.valueOf(KENAR_YAN));
+        m.setHeader(BigInteger.valueOf(400));
+        m.setFooter(BigInteger.valueOf(400));
+        // Kalın siyah çerçeve: sayfa kenarlığı
+        CTPageBorders pb = s.addNewPgBorders();
+        pb.setOffsetFrom(STPageBorderOffset.PAGE);
+        for (CTBorder b : new CTBorder[]{pb.addNewTop(), pb.addNewLeft(), pb.addNewBottom(), pb.addNewRight()}) {
+            b.setVal(STBorder.SINGLE);
+            b.setSz(BigInteger.valueOf(18)); // 2,25 pt
+            b.setSpace(BigInteger.valueOf(24));
+            b.setColor("000000");
+        }
+    }
+
+    private static void logo(XWPFDocument doc, Path logo) throws IOException {
+        if (logo == null || !Files.isRegularFile(logo)) return;
+        BufferedImage img;
+        try (InputStream in = Files.newInputStream(logo)) {
+            img = ImageIO.read(in);
+        }
+        if (img == null) return;
+        double yukPt = LOGO_YUKSEKLIK_CM / 2.54 * 72.0;
+        double genPt = yukPt * img.getWidth() / img.getHeight();
+        double maxGen = ICERIK / 20.0;
+        if (genPt > maxGen) { // çok geniş logolarda en-boy oranı korunarak daraltılır
+            yukPt = yukPt * maxGen / genPt;
+            genPt = maxGen;
+        }
+        XWPFParagraph p = doc.createParagraph();
+        p.setAlignment(ParagraphAlignment.CENTER);
+        p.setSpacingBefore(200);
+        p.setSpacingAfter(200);
+        int tur = logo.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".png")
+                ? Document.PICTURE_TYPE_PNG : Document.PICTURE_TYPE_JPEG;
+        try (InputStream in = Files.newInputStream(logo)) {
+            p.createRun().addPicture(in, tur, logo.getFileName().toString(),
+                    Units.toEMU(genPt), Units.toEMU(yukPt));
+        } catch (org.apache.poi.openxml4j.exceptions.InvalidFormatException e) {
+            throw new IOException("Logo eklenemedi: " + e.getMessage(), e);
+        }
+    }
+
+    private void baslik(XWPFDocument doc, FormVerisi f) {
+        Ayarlar.FormTuru ft = ayarlar.formTuru(f.formTuru).orElse(new Ayarlar.FormTuru(f.formTuru, f.formTuru, null));
+        XWPFParagraph p = doc.createParagraph();
+        p.setAlignment(ParagraphAlignment.CENTER);
+        p.setSpacingAfter(f.ikiDilli() ? 80 : 200);
+        run(p, ft.baslik(), true, false, false, BASLIK);
+        if (f.ikiDilli() && ft.baslikEn() != null && !ft.baslikEn().isBlank()) {
+            XWPFParagraph e = doc.createParagraph();
+            e.setAlignment(ParagraphAlignment.CENTER);
+            e.setSpacingAfter(200);
+            run(e, ft.baslikEn(), true, false, false, BASLIK);
+        }
+    }
+
+    // ------------------------------------------------------------------ ana tablo
+
+    private void anaTablo(XWPFDocument doc, FormVerisi f) {
+        XWPFTable t = doc.createTable(1, 3);
+        sabitTablo(t, new int[]{ETIKET_SUTUN, AYRAC_SUTUN, DEGER_SUTUN});
+        kenarliklar(t, true);
+        t.setCellMargins(70, 80, 70, 80);
+        boolean en = f.ikiDilli();
+
+        satir(t, true, en ? "Tarih / Date" : "Tarih", c -> tekSatir(c, f.tarih));
+        satir(t, false, en ? "Belge Türü / Document Type" : "Belge Türü", c -> tekSatir(c, belgeTuru(f)));
+        satir(t, false, en ? "Belgeyi Talep Eden Departman / Requesting Department" : "Belgeyi Talep Eden Departman",
+                c -> cokSatir(c, f.talepEdenDepartman));
+        satir(t, false, en ? "Belgeyi İmzaya Sunan Departman / Department Submitting for Signature"
+                : "Belgeyi İmzaya Sunan Departman", c -> cokSatir(c, f.imzayaSunanDepartman));
+
+        if (f.azilname()) {
+            satir(t, false, "Azledilecek Kişiler", c -> tekSatir(c, String.join(", ", f.kisiler)));
+            satir(t, false, "Azleden Şirketler", c -> liste(c, f.sirketler));
+            satir(t, false, "Konu", c -> konuVeNot(c, f));
+        } else if (f.vekaletname()) {
+            satir(t, false, "Vekaletname Verilecek Kişiler", c -> tekSatir(c, String.join(", ", f.kisiler)));
+            satir(t, false, "Vekaletname Veren Şirket", c -> liste(c, f.sirketler));
+            satir(t, false, "Sona Erme Tarihi", c -> tekSatir(c, f.sonaErmeTarihi));
+            satir(t, false, "Konu", c -> konuVeNot(c, f));
+        } else {
+            satir(t, false, en ? "Belgenin Konusu/Özeti / Subject/Summary of the Document" : "Belgenin Konusu/Özeti",
+                    c -> konuBlogu(c, f));
+        }
+
+        List<String> yetkili = f.imzasinaSunulacak.stream().filter(s -> s != null && !s.isBlank()).toList();
+        if (!yetkili.isEmpty()) {
+            satir(t, false, en ? "İmzasına Sunulacak Yetkili / Authorized Signatory" : "İmzasına Sunulacak Yetkili",
+                    c -> {
+                        XWPFParagraph p = ilkParagraf(c);
+                        for (int i = 0; i < yetkili.size(); i++) {
+                            if (i > 0) p = c.addParagraph();
+                            aciklamali(p, yetkili.get(i));
+                        }
+                    });
+        }
+    }
+
+    private static String belgeTuru(FormVerisi f) {
+        String b = f.belgeTuru == null ? "" : f.belgeTuru.trim();
+        if (f.ikiDilli() && !b.contains("/") && BELGE_TURU_EN.containsKey(b)) {
+            return b + " / " + BELGE_TURU_EN.get(b);
+        }
+        return b;
+    }
+
+    /** "Sn. Murathan KALYONCU (Kalyon İşletme için)" → parantezli kısım italik. */
+    private static void aciklamali(XWPFParagraph p, String satir) {
+        int i = satir.indexOf('(');
+        if (i > 0 && satir.trim().endsWith(")")) {
+            run(p, satir.substring(0, i).stripTrailing() + " ", false, false, false, GOVDE);
+            run(p, satir.substring(i).trim(), false, true, false, GOVDE);
+        } else {
+            run(p, satir, false, false, false, GOVDE);
+        }
+    }
+
+    private void satir(XWPFTable t, boolean ilk, String etiket, Consumer<XWPFTableCell> deger) {
+        XWPFTableRow r = ilk ? t.getRow(0) : t.createRow();
+        r.setCantSplitRow(true);
+        XWPFTableCell e = r.getCell(0);
+        e.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
+        run(ilkParagraf(e), etiket, true, false, false, GOVDE);
+        XWPFTableCell a = r.getCell(1);
+        a.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
+        XWPFParagraph ap = ilkParagraf(a);
+        ap.setAlignment(ParagraphAlignment.CENTER);
+        run(ap, ":", false, false, false, GOVDE);
+        XWPFTableCell d = r.getCell(2);
+        d.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
+        deger.accept(d);
+        hucreGenislikleri(r, new int[]{ETIKET_SUTUN, AYRAC_SUTUN, DEGER_SUTUN});
+    }
+
+    private static void tekSatir(XWPFTableCell c, String s) {
+        run(ilkParagraf(c), s == null ? "" : s, false, false, false, GOVDE);
+    }
+
+    private static void cokSatir(XWPFTableCell c, String s) {
+        liste(c, s == null ? List.of() : List.of(s.split("\\R")));
+    }
+
+    private static void liste(XWPFTableCell c, List<String> satirlar) {
+        XWPFParagraph p = ilkParagraf(c);
+        boolean ilk = true;
+        for (String s : satirlar) {
+            if (s == null || s.isBlank()) continue;
+            if (!ilk) p = c.addParagraph();
+            run(p, s.trim(), false, false, false, GOVDE);
+            ilk = false;
+        }
+    }
+
+    /** YOBF / YOBF_TR_EN: Taraflar + Konu + (Bedel) + (Not). */
+    private void konuBlogu(XWPFTableCell c, FormVerisi f) {
+        boolean en = f.ikiDilli();
+        boolean coklu = f.sozlesmeler.size() > 1;
+        XWPFParagraph p = ilkParagraf(c);
+        boolean bas = true;
+
+        for (int g = 0; g < f.sozlesmeler.size(); g++) {
+            SozlesmeGrubu sg = f.sozlesmeler.get(g);
+            List<String> taraflar = sg.taraflar.stream().filter(x -> x != null && !x.isBlank()).toList();
+            if (taraflar.isEmpty()) continue;
+            if (!bas) p = c.addParagraph();
+            bas = false;
+            String etiket = (coklu ? (g + 1) + ". Sözleşme " : "") + (en ? "Taraflar / Parties:" : "Taraflar:");
+            run(p, etiket, true, false, true, GOVDE);
+            for (int i = 0; i < taraflar.size(); i++) {
+                XWPFParagraph tp = c.addParagraph();
+                tp.setIndentationLeft(coklu ? 500 : 360);
+                tp.setIndentationHanging(0);
+                run(tp, (i + 1) + ") " + taraflar.get(i).trim(), false, false, false, GOVDE);
+            }
+        }
+
+        if (!bas) bosParagraf(c);
+        XWPFParagraph kp = bas ? p : c.addParagraph();
+        kp.setAlignment(ParagraphAlignment.BOTH);
+        run(kp, en ? "Konu / Subject:" : "Konu:", true, false, true, GOVDE);
+        run(kp, " " + nz(f.konuTr).trim(), false, false, false, GOVDE);
+        if (en && !nz(f.konuEn).isBlank()) {
+            bosParagraf(c);
+            XWPFParagraph ep = c.addParagraph();
+            ep.setAlignment(ParagraphAlignment.BOTH);
+            run(ep, f.konuEn.trim(), false, false, false, GOVDE);
+        }
+
+        // Bedel
+        boolean bedelVar = f.sozlesmeler.stream().anyMatch(sg -> sg.bedeller.stream().anyMatch(b -> !b.bos()));
+        if (bedelVar) {
+            bosParagraf(c);
+            for (int g = 0; g < f.sozlesmeler.size(); g++) {
+                List<Bedel> bl = f.sozlesmeler.get(g).bedeller.stream().filter(b -> !b.bos()).toList();
+                for (int i = 0; i < bl.size(); i++) {
+                    XWPFParagraph bp = c.addParagraph();
+                    String etiket = coklu ? (g + 1) + ". Sözleşme Bedeli" : nz(f.bedelEtiketi, "Bedel");
+                    if (en) etiket += " / " + BEDEL_ETIKETI_EN.getOrDefault(coklu ? "Sözleşme Bedeli" : etiket, "Price");
+                    if (i == 0) {
+                        run(bp, etiket + ":", true, false, true, GOVDE);
+                        run(bp, " " + bl.get(i).metin(), false, false, false, GOVDE);
+                    } else {
+                        bp.setIndentationLeft(360);
+                        run(bp, bl.get(i).metin(), false, false, false, GOVDE);
+                    }
+                }
+            }
+        }
+        not(c, f);
+    }
+
+    /** Azilname / Vekaletname: Konu (+ Not). */
+    private void konuVeNot(XWPFTableCell c, FormVerisi f) {
+        XWPFParagraph p = ilkParagraf(c);
+        p.setAlignment(ParagraphAlignment.BOTH);
+        run(p, nz(f.konuTr).trim(), false, false, false, GOVDE);
+        not(c, f);
+    }
+
+    private static void not(XWPFTableCell c, FormVerisi f) {
+        if (nz(f.notMetni).isBlank()) return;
+        bosParagraf(c);
+        String[] satirlar = f.notMetni.trim().split("\\R");
+        for (int i = 0; i < satirlar.length; i++) {
+            XWPFParagraph np = c.addParagraph();
+            np.setAlignment(ParagraphAlignment.BOTH);
+            if (i == 0) run(np, nz(f.notEtiketi, "Not:") + " ", true, true, false, ACIKLAMA);
+            run(np, satirlar[i], false, true, false, ACIKLAMA);
+        }
+    }
+
+    // ------------------------------------------------------------------ imza bloğu
+
+    private void imzaBlogu(XWPFDocument doc, FormVerisi f) {
+        Ayarlar.ImzaBlogu ib = ayarlar.imzaBlogu();
+        boolean en = f.ikiDilli();
+        List<Imzaci> imzacilar = new ArrayList<>(f.anaImzacilar.stream().filter(i -> i != null && !i.ad().isBlank()).toList());
+        if (imzacilar.size() > ib.anaImzaciMax()) imzacilar = imzacilar.subList(0, ib.anaImzaciMax());
+
+        bosParagraf(doc, 2);
+        XWPFParagraph h = doc.createParagraph();
+        h.setAlignment(ParagraphAlignment.CENTER);
+        birlikte(h);
+        run(h, en ? ib.anaBaslik() + " / " + ib.anaBaslikEn() : ib.anaBaslik(), true, false, true, 13);
+        bosParagraf(doc, 1);
+
+        if (!imzacilar.isEmpty()) {
+            List<Integer> satirlar = ib.satirlar(imzacilar.size());
+            int enCok = satirlar.stream().mapToInt(Integer::intValue).max().orElse(1);
+            int hucre = ICERIK / Math.max(2, enCok);
+            int idx = 0;
+            for (int s = 0; s < satirlar.size(); s++) {
+                if (s > 0) bosParagraf(doc, 1);
+                imzaSatiri(doc, imzacilar.subList(idx, idx + satirlar.get(s)), hucre, en);
+                idx += satirlar.get(s);
+            }
+        }
+
+        if (f.ekOnayAcik && f.ekOnayImzaci != null && !f.ekOnayImzaci.ad().isBlank()) {
+            bosParagraf(doc, 2);
+            XWPFParagraph eh = doc.createParagraph();
+            eh.setAlignment(ParagraphAlignment.CENTER);
+            birlikte(eh);
+            String b = nz(f.ekOnayBaslik, ib.ekOnayBaslik());
+            run(eh, en ? b + " / " + ib.ekOnayBaslikEn() : b, true, false, true, 13);
+            bosParagraf(doc, 1);
+            imzaSatiri(doc, List.of(f.ekOnayImzaci), ICERIK / 2, en);
+        }
+    }
+
+    private static void imzaSatiri(XWPFDocument doc, List<Imzaci> kisiler, int hucre, boolean en) {
+        int n = kisiler.size();
+        XWPFTable t = doc.createTable(1, n);
+        int[] g = new int[n];
+        java.util.Arrays.fill(g, hucre);
+        sabitTablo(t, g);
+        kenarliklar(t, false);
+        t.setTableAlignment(TableRowAlign.CENTER);
+        t.setCellMargins(0, 60, 0, 60);
+        XWPFTableRow r = t.getRow(0);
+        r.setCantSplitRow(true);
+        for (int i = 0; i < n; i++) {
+            Imzaci k = kisiler.get(i);
+            XWPFTableCell c = r.getCell(i);
+            XWPFParagraph ad = ilkParagraf(c);
+            ad.setAlignment(ParagraphAlignment.CENTER);
+            birlikte(ad);
+            run(ad, k.ad(), true, false, false, GOVDE);
+            if (!k.unvan().isBlank()) {
+                XWPFParagraph u = c.addParagraph();
+                u.setAlignment(ParagraphAlignment.CENTER);
+                birlikte(u);
+                run(u, k.unvan(), false, true, false, ACIKLAMA);
+            }
+            if (en && !k.unvanEn().isBlank() && !k.unvanEn().equals(k.unvan())) {
+                XWPFParagraph u = c.addParagraph();
+                u.setAlignment(ParagraphAlignment.CENTER);
+                birlikte(u);
+                run(u, k.unvanEn(), false, true, false, ACIKLAMA);
+            }
+            for (int b = 0; b < 4; b++) birlikte(c.addParagraph());
+            XWPFParagraph cizgi = c.addParagraph();
+            cizgi.setBorderBottom(Borders.SINGLE);
+            cizgi.setIndentationLeft(150);
+            cizgi.setIndentationRight(150);
+        }
+        hucreGenislikleri(r, g);
+    }
+
+    // ------------------------------------------------------------------ yardımcılar
+
+    private static void sabitTablo(XWPFTable t, int[] genislikler) {
+        int toplam = 0;
+        for (int w : genislikler) toplam += w;
+        t.setWidthType(TableWidthType.DXA);
+        t.setWidth(String.valueOf(toplam));
+        CTTblPr pr = t.getCTTbl().getTblPr() != null ? t.getCTTbl().getTblPr() : t.getCTTbl().addNewTblPr();
+        (pr.isSetTblLayout() ? pr.getTblLayout() : pr.addNewTblLayout()).setType(STTblLayoutType.FIXED);
+        CTTblGrid grid = t.getCTTbl().getTblGrid() != null ? t.getCTTbl().getTblGrid() : t.getCTTbl().addNewTblGrid();
+        while (grid.sizeOfGridColArray() > 0) grid.removeGridCol(0);
+        for (int w : genislikler) grid.addNewGridCol().setW(BigInteger.valueOf(w));
+        for (XWPFTableRow r : t.getRows()) hucreGenislikleri(r, genislikler);
+    }
+
+    private static void hucreGenislikleri(XWPFTableRow r, int[] genislikler) {
+        for (int i = 0; i < genislikler.length && i < r.getTableCells().size(); i++) {
+            XWPFTableCell c = r.getCell(i);
+            c.setWidthType(TableWidthType.DXA);
+            c.setWidth(String.valueOf(genislikler[i]));
+        }
+    }
+
+    /** cizgili=true: yalnızca üst/alt ve iç yatay ince çizgiler; false: hiç kenarlık yok. */
+    private static void kenarliklar(XWPFTable t, boolean cizgili) {
+        CTTblPr pr = t.getCTTbl().getTblPr();
+        CTTblBorders b = pr.isSetTblBorders() ? pr.getTblBorders() : pr.addNewTblBorders();
+        kenar(b.isSetTop() ? b.getTop() : b.addNewTop(), cizgili);
+        kenar(b.isSetBottom() ? b.getBottom() : b.addNewBottom(), cizgili);
+        kenar(b.isSetInsideH() ? b.getInsideH() : b.addNewInsideH(), cizgili);
+        kenar(b.isSetLeft() ? b.getLeft() : b.addNewLeft(), false);
+        kenar(b.isSetRight() ? b.getRight() : b.addNewRight(), false);
+        kenar(b.isSetInsideV() ? b.getInsideV() : b.addNewInsideV(), false);
+    }
+
+    private static void kenar(CTBorder b, boolean var) {
+        b.setVal(var ? STBorder.SINGLE : STBorder.NONE);
+        b.setSz(BigInteger.valueOf(var ? 4 : 0));
+        b.setSpace(BigInteger.ZERO);
+        b.setColor("000000");
+    }
+
+    /** Paragrafı bir sonrakiyle aynı sayfada tutar (imza bloğunun bölünmemesi için). */
+    private static void birlikte(XWPFParagraph p) {
+        if (p.getCTP().getPPr() == null) p.getCTP().addNewPPr();
+        p.setKeepNext(true);
+    }
+
+    private static XWPFParagraph ilkParagraf(XWPFTableCell c) {
+        return c.getParagraphs().isEmpty() ? c.addParagraph() : c.getParagraphs().get(0);
+    }
+
+    private static void bosParagraf(XWPFTableCell c) {
+        c.addParagraph();
+    }
+
+    private static void bosParagraf(XWPFDocument doc, int adet) {
+        for (int i = 0; i < adet; i++) doc.createParagraph();
+    }
+
+    static XWPFRun run(XWPFParagraph p, String metin, boolean kalin, boolean italik, boolean altiCizili, int punto) {
+        XWPFRun r = p.createRun();
+        r.setFontFamily(FONT);
+        r.setFontSize(punto);
+        r.setBold(kalin);
+        r.setItalic(italik);
+        if (altiCizili) r.setUnderline(UnderlinePatterns.SINGLE);
+        r.setText(metin == null ? "" : metin);
+        return r;
+    }
+
+    private static String nz(String s) { return s == null ? "" : s; }
+
+    private static String nz(String s, String varsayilan) { return s == null || s.isBlank() ? varsayilan : s; }
+}

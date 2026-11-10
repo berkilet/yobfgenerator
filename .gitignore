@@ -1,0 +1,13 @@
+target/
+dist/
+*.class
+.idea/
+.vscode/
+*.iml
+
+# Gercek belgeler / kisisel veri - repoya girmez (CLAUDE.md §11, §13)
+test-belgeler/
+ornekler/
+kayit/
+cikti/
+anahtar.txt

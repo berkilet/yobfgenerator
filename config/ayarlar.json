@@ -1,0 +1,56 @@
+{
+  "model": "claude-sonnet-5-5",
+  "konu_max_karakter": 400,
+  "konu_sinir_sert": true,
+  "kisaltma_deneme_sayisi": 2,
+  "maskeleme": { "tckn": true, "iban": true, "telefon": true, "eposta": true },
+  "proxy": { "host": "", "port": 0 },
+
+  "form_turleri": [
+    { "kod": "YOBF",        "baslik": "YÖNETİCİ ÖZET BİLGİLENDİRME FORMU" },
+    { "kod": "YOBF_TR_EN",  "baslik": "YÖNETİCİ ÖZET BİLGİLENDİRME FORMU", "baslik_en": "EXECUTIVE SUMMARY INFORMATION FORM" },
+    { "kod": "AZILNAME",    "baslik": "AZİLNAME ONAY FORMU" },
+    { "kod": "VEKALETNAME", "baslik": "VEKALETNAME ONAY FORMU" }
+  ],
+
+  "belge_turleri": [
+    "Sözleşme", "Zeyilname", "Protokol", "Gizlilik Sözleşmesi", "Variation Order",
+    "Yönetim Kurulu Kararı", "Avukatlık Ücret Sözleşmesi", "Vekaletname", "Azilnameler", "Diğer"
+  ],
+
+  "talep_eden_departmanlar": [
+    "Kalyon Enerji HESS-Q Departmanı",
+    "Kalyon Enerji Operasyonlar Departmanı",
+    "Operasyonlar Departmanı / İşletmeler Direktörlüğü",
+    "İş Geliştirme",
+    "Mali İşler & Finans",
+    "Enerji Grubu Hukuk ve Uyum Müşavirliği"
+  ],
+
+  "imzaya_sunan_departmanlar": [
+    "Kalyon Enerji Yatırımları A.Ş. Hukuk ve Uyum Müşavirliği",
+    "Kalyon Enerji Hukuk ve Uyum Müşavirliği",
+    "Enerji Grubu Hukuk ve Uyum Müşavirliği"
+  ],
+  "imzaya_sunan_varsayilan": "Kalyon Enerji Yatırımları A.Ş. Hukuk ve Uyum Müşavirliği",
+
+  "imza_blogu": {
+    "ana_baslik": "UYGUNDUR",
+    "ana_baslik_en": "APPROVED",
+    "ana_imzaci_min": 1,
+    "ana_imzaci_max": 5,
+    "yerlesim": { "1": [1], "2": [2], "3": [3], "4": [2, 2], "5": [3, 2] },
+    "ek_onay_acik_varsayilan": false,
+    "ek_onay_baslik": "ONAY",
+    "ek_onay_baslik_en": "APPROVAL"
+  },
+
+  "departman_on_ayarlari": {
+    "Kalyon Enerji HESS-Q Departmanı":                   { "imzacilar": ["myagci", "gsumer"] },
+    "Kalyon Enerji Operasyonlar Departmanı":             { "imzacilar": ["gduman", "gsumer"] },
+    "Operasyonlar Departmanı / İşletmeler Direktörlüğü": { "imzacilar": ["gduman", "gsumer"] },
+    "İş Geliştirme":                                     { "imzacilar": ["gsumer", "bulker"], "imzasina_sunulacak": ["Sn. Haluk KALYONCU"] },
+    "Mali İşler & Finans":                               { "imzacilar": ["takbulut", "fkolmek", "gsumer"] },
+    "Enerji Grubu Hukuk ve Uyum Müşavirliği":            { "imzacilar": ["gsumer", "fkolmek"] }
+  }
+}

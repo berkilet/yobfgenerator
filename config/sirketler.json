@@ -1,0 +1,90 @@
+{
+  "_aciklama": "Grup şirketleri ve logo eşlemesi. 'logo' dosyası assets/logos/ altında yoksa 'logo_yedek' zinciri, o da yoksa varsayilan_logo kullanılır. Örnek formlardan çıkarılmıştır; eksik şirketler ve logolar kullanıcı tarafından tamamlanmalıdır.",
+  "varsayilan_logo": "kalyon-enerji.png",
+  "sirketler": [
+    {
+      "id": "kalyon-enerji-yatirimlari",
+      "unvan": "Kalyon Enerji Yatırımları A.Ş.",
+      "takma_adlar": ["Kalyon Enerji", "Kalyon Enerji Yatırımları Anonim Şirketi"],
+      "logo": "kalyon-enerji.png",
+      "logo_yedek": null
+    },
+    {
+      "id": "kalyon-gunes",
+      "unvan": "Kalyon Güneş Enerjisi Üretim A.Ş.",
+      "takma_adlar": ["Kalyon Güneş", "Kalyon Güneş Enerjisi Üretim Anonim Şirketi"],
+      "logo": "kalyon-gunes.png",
+      "logo_yedek": "kalyon-enerji.png"
+    },
+    {
+      "id": "kalyon-yeka-res-3",
+      "unvan": "Kalyon YEKA RES 3 Rüzgar Enerjisi Yatırımları A.Ş.",
+      "takma_adlar": ["YEKA RES 3", "Kalyon YEKA RES-3"],
+      "logo": "kalyon-yeka-res-3.png",
+      "logo_yedek": "kalyon-enerji.png"
+    },
+    {
+      "id": "kalyon-yeka-res-4",
+      "unvan": "Kalyon YEKA RES 4 Rüzgar Enerjisi Yatırımları A.Ş.",
+      "takma_adlar": ["YEKA RES 4", "Kalyon YEKA RES-4"],
+      "logo": "kalyon-yeka-res-4.png",
+      "logo_yedek": "kalyon-enerji.png"
+    },
+    {
+      "id": "kalyon-yeka-ges-3-4",
+      "unvan": "Kalyon YEKA GES 3 ve 4 Güneş Enerjisi Yatırımları A.Ş.",
+      "takma_adlar": ["YEKA GES 3 ve 4", "Kalyon YEKA GES 3-4"],
+      "logo": "kalyon-yeka-ges-3-4.png",
+      "logo_yedek": "kalyon-enerji.png"
+    },
+    {
+      "id": "kalyon-yeka-ges-5",
+      "unvan": "Kalyon YEKA GES 5 Elektrik Üretim A.Ş.",
+      "takma_adlar": ["YEKA GES 5", "Kalyon Yeka GES 5"],
+      "logo": "kalyon-yeka-ges-5.png",
+      "logo_yedek": "kalyon-enerji.png"
+    },
+    {
+      "id": "karapinar-eib-yonetici",
+      "unvan": "Karapınar Birinci Kısım ve Niğde Bor Enerji İhtisas Bölgesi Yönetici A.Ş.",
+      "takma_adlar": ["Karapınar EİB Yönetici"],
+      "logo": "karapinar-eib-yonetici.png",
+      "logo_yedek": "kalyon-enerji.png"
+    },
+    {
+      "id": "kalyon-isletme",
+      "unvan": "Kalyon İşletme ve Yönetim Danışmanlığı A.Ş.",
+      "takma_adlar": ["Kalyon İşletme"],
+      "logo": "kalyon-isletme.png",
+      "logo_yedek": "kalyon-enerji.png"
+    },
+    {
+      "id": "kalyon-ev",
+      "unvan": "Kalyon Electrical Vehicle Enerji Yatırım A.Ş.",
+      "takma_adlar": ["Kalyon EV", "Kalyon Electrical Vehicle"],
+      "logo": "kalyon-ev.png",
+      "logo_yedek": "kalyon-enerji.png"
+    },
+    {
+      "id": "kalen-elektrik-toptan",
+      "unvan": "Kalen Elektrik Toptan Satış ve Ticaret A.Ş.",
+      "takma_adlar": ["Kalen Elektrik Toptan Satış ve Tic. A.Ş.", "Kalen Elektrik", "KALEN"],
+      "logo": "kalen.png",
+      "logo_yedek": "kalyon-enerji.png"
+    },
+    {
+      "id": "kalen-enerji-uretim",
+      "unvan": "Kalen Enerji Elektrik Üretim A.Ş.",
+      "takma_adlar": ["Kalen Enerji"],
+      "logo": "kalen.png",
+      "logo_yedek": "kalyon-enerji.png"
+    },
+    {
+      "id": "melet-enerji",
+      "unvan": "Melet Enerji Elektrik Üretim ve Ticaret A.Ş.",
+      "takma_adlar": ["Melet Enerji Elektrik Üretim ve Tic. A.Ş.", "Melet Enerji"],
+      "logo": "melet.png",
+      "logo_yedek": "kalyon-enerji.png"
+    }
+  ]
+}

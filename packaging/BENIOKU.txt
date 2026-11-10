@@ -1,0 +1,24 @@
+YÖBF Otomatörü
+==============
+
+Kurulum gerekmez. Klasörü istediğiniz yere (ör. Belgelerim) çıkarın ve
+YOBF-Otomator.exe dosyasını çalıştırın. Yönetici yetkisi gerekmez.
+
+API anahtarı
+  İlk açılışta Ayarlar > API Anahtarı… menüsünden girin. Anahtar
+  %APPDATA%\YOBF\anahtar.txt dosyasına kaydedilir (bu klasöre değil).
+  ANTHROPIC_API_KEY ortam değişkeni tanımlıysa o önceliklidir.
+
+Düzenlenebilir dosyalar (uygulamayı yeniden derlemeden)
+  config\ayarlar.json     model adı, konu sınırı, departmanlar, imza bloğu, proxy
+  config\sirketler.json   grup şirketleri, takma adlar, logo eşlemesi
+  config\imzacilar.json   imzacılar ve kanonik unvanlar
+  prompts\ozet_prompt.md  modele verilen sistem talimatı
+  assets\logos\*.png      şirket logoları (kalyon-enerji.png zorunlu)
+  Değişiklikten sonra: Ayarlar > Yapılandırmayı Yeniden Yükle
+
+Kurumsal proxy
+  config\ayarlar.json → "proxy": { "host": "proxy.sirket.local", "port": 8080 }
+
+İşlem günlüğü
+  kayit\islem_gunlugu.csv (klasör yazılamıyorsa %APPDATA%\YOBF\kayit)
