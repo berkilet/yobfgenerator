@@ -11,6 +11,7 @@ import java.util.Optional;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Ayarlar(
         @JsonProperty("model") String model,
+        @JsonProperty("modeller") List<ModelSecenegi> modeller,
         @JsonProperty("konu_max_karakter") int konuMaxKarakter,
         @JsonProperty("konu_sinir_sert") boolean konuSinirSert,
         @JsonProperty("kisaltma_deneme_sayisi") int kisaltmaDenemeSayisi,
@@ -38,6 +39,27 @@ public record Ayarlar(
         departmanOnAyarlari = departmanOnAyarlari == null ? Map.of() : new LinkedHashMap<>(departmanOnAyarlari);
         // Model bir isteği reddederse (stop_reason=refusal) sunucu tarafında yedek modele geçilir.
         if (sunucuTarafiYedekModel == null) sunucuTarafiYedekModel = true;
+        if (model == null || model.isBlank()) model = "claude-haiku-5-5";
+        if (modeller == null || modeller.isEmpty()) {
+            modeller = List.of(new ModelSecenegi(model, model, sunucuTarafiYedekModel));
+        } else {
+            modeller = List.copyOf(modeller);
+        }
+    }
+
+    /** Arayüzde seçilebilen model ve sunucu tarafı yedek modeli (fallbacks) destekleyip desteklemediği. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ModelSecenegi(
+            @JsonProperty("id") String id,
+            @JsonProperty("ad") String ad,
+            @JsonProperty("yedek_model") boolean yedekModel) {
+        @Override public String toString() { return ad == null || ad.isBlank() ? id : ad; }
+    }
+
+    /** Model id'sine ait seçenek; listede yoksa yedek model kapalı varsayılır (güvenli). */
+    public ModelSecenegi modelSecenegi(String id) {
+        return modeller.stream().filter(m -> m.id().equals(id)).findFirst()
+                .orElse(new ModelSecenegi(id, id, false));
     }
 
     public Optional<FormTuru> formTuru(String kod) {

@@ -1,5 +1,9 @@
 {
-  "model": "claude-sonnet-5-5",
+  "model": "claude-haiku-5-5",
+  "modeller": [
+    { "id": "claude-haiku-5-5",  "ad": "Haiku 5.5 — ekonomik",     "yedek_model": false },
+    { "id": "claude-sonnet-5-5", "ad": "Sonnet 5.5 — daha güçlü", "yedek_model": true }
+  ],
   "konu_max_karakter": 400,
   "konu_sinir_sert": true,
   "kisaltma_deneme_sayisi": 2,

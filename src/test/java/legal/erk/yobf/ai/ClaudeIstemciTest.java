@@ -37,6 +37,22 @@ class ClaudeIstemciTest {
     }
 
     @Test
+    void varsayilanModelHaikuVeYedekModelYalnizcaDestekleyenlerde() throws Exception {
+        assertEquals("claude-haiku-5-5", a.model());
+        assertFalse(a.modelSecenegi("claude-haiku-5-5").yedekModel());
+        assertTrue(a.modelSecenegi("claude-sonnet-5-5").yedekModel());
+        assertFalse(a.modelSecenegi("bilinmeyen-model").yedekModel(), "listede olmayan modelde yedek kapalı");
+        try (ClaudeIstemci haiku = new ClaudeIstemci(a, "claude-haiku-5-5", Path.of("prompts/ozet_prompt.md"), "k");
+             ClaudeIstemci sonnet = new ClaudeIstemci(a, "claude-sonnet-5-5", Path.of("prompts/ozet_prompt.md"), "k")) {
+            String h = haiku.istek(OzetSemasi.class, "x", 100).rawParams()._body().toString();
+            String s = sonnet.istek(OzetSemasi.class, "x", 100).rawParams()._body().toString();
+            assertTrue(h.contains("claude-haiku-5-5"), h);
+            assertTrue(h.contains("fallbacks=,"), "Haiku 5.5 isteğinde sunucu tarafı yedek model (fallbacks) boş olmalı");
+            assertFalse(s.contains("fallbacks=,"), "Sonnet isteğinde fallbacks dolu olmalı");
+        }
+    }
+
+    @Test
     void promptYerTutucuDoldurulur() throws Exception {
         try (ClaudeIstemci c = new ClaudeIstemci(a, Path.of("prompts/ozet_prompt.md"), "test-anahtar")) {
             String m = c.kullaniciMesaji(List.of(

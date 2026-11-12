@@ -15,7 +15,7 @@ Referans formlar: `ornekler/` klasöründeki üç PDF (toplam 14 form). Üretile
 | Arayüz | Swing + FlatLaf | jlink ile küçük imaj, ek runtime yok |
 | PDF okuma | Apache PDFBox 3.x | Metin katmanı yoksa kullanıcıya "taranmış belge" uyarısı ver (OCR v1'de kapsam dışı) |
 | Word okuma/yazma | Apache POI 5.x (XWPF) | .docx girdi + çıktı |
-| Yapay zekâ | Anthropic resmi Java SDK (`com.anthropic:anthropic-java`) | Model adı `config/ayarlar.json` içinden okunur, koda gömülmez |
+| Yapay zekâ | Anthropic resmi Java SDK (`com.anthropic:anthropic-java`) | Model adı `config/ayarlar.json` içinden okunur, koda gömülmez. Varsayılan `claude-haiku-5-5` (ekonomik); `modeller` listesindekiler arayüzden seçilir. Sunucu tarafı yedek model (`fallbacks`) yalnızca `yedek_model: true` olan modellerde gönderilir (Haiku 5.5 desteklemez). |
 | JSON | Jackson | |
 | Paketleme | `jlink` + `jpackage --type app-image` | Çıktı: içinde runtime ve `.exe` bulunan klasör → zip. **Kurulum ve yönetici yetkisi gerektirmez.** |
 | CI | GitHub Actions `windows-latest` | jpackage çapraz derleme yapmadığı için Windows paketi burada üretilir |
@@ -163,7 +163,8 @@ Form altındaki **UYGUNDUR** bloğu:
 - İki sütunlu tablo: etiket sütunu ≈ %28, `:` ayracı, değer sütunu; satır ayırıcı ince yatay çizgiler.
 - Konu metni iki yana yaslı.
 - Alt alan etiketleri (`Taraflar:`, `Konu:`, `Bedel:`) kalın + altı çizili.
-- PDF çıktısı v1 kapsamı dışındadır (kullanıcı Word'den PDF alır); v2 için değerlendirilecek.
+- PDF çıktısı: onay penceresinde "PDF olarak da kaydet" seçilirse .docx, bilgisayarda yüklü Microsoft Word ile (COM/PowerShell), Word yoksa LibreOffice ile PDF'e çevrilir (`render/PdfDonusturucu`). İkisi de yoksa yalnızca .docx üretilir.
+- Canlı önizleme: düzenleme ekranının sağında formun yaklaşık görünümü (`ui/OnizlemePaneli`); FormYazici ile aynı ölçü ve sığdırma kurallarını kullanır.
 
 ## 10. Proje yapısı
 

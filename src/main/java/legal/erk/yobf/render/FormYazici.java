@@ -58,26 +58,26 @@ import java.util.function.Predicate;
 public final class FormYazici {
 
     // Ölçüler (twip = 1/20 pt)
-    static final int A4_GEN = 11906, A4_YUK = 16838;
-    static final int KENAR_YAN = 1000, KENAR_UST = 850, KENAR_ALT = 850;
-    static final int ICERIK = A4_GEN - 2 * KENAR_YAN;
-    static final int ETIKET_SUTUN = Math.round(ICERIK * 0.28f);
-    static final int AYRAC_SUTUN = 280;
-    static final int DEGER_SUTUN = ICERIK - ETIKET_SUTUN - AYRAC_SUTUN;
-    static final double LOGO_YUKSEKLIK_CM = 2.2;
+    public static final int A4_GEN = 11906, A4_YUK = 16838;
+    public static final int KENAR_YAN = 1000, KENAR_UST = 850, KENAR_ALT = 850;
+    public static final int ICERIK = A4_GEN - 2 * KENAR_YAN;
+    public static final int ETIKET_SUTUN = Math.round(ICERIK * 0.28f);
+    public static final int AYRAC_SUTUN = 280;
+    public static final int DEGER_SUTUN = ICERIK - ETIKET_SUTUN - AYRAC_SUTUN;
+    public static final double LOGO_YUKSEKLIK_CM = 2.2;
 
-    static final String FONT = "Cambria";
-    static final int GOVDE = 12, ACIKLAMA = 10, BASLIK = 16;
+    public static final String FONT = "Cambria";
+    public static final int GOVDE = 12, ACIKLAMA = 10, BASLIK = 16;
     /** İmza bloğu: örnek formlardaki gibi ad büyük ve kalın, unvan okunur büyüklükte italik. */
-    static final int IMZACI_AD = 14, IMZACI_UNVAN = 11, IMZA_BASLIK = 15;
+    public static final int IMZACI_AD = 14, IMZACI_UNVAN = 11, IMZA_BASLIK = 15;
     /** İmza için unvan ile imza çizgisi arasında bırakılan boşluk (twip; ≈ 2 cm). */
-    static final int IMZA_BOSLUGU = 1150;
+    public static final int IMZA_BOSLUGU = 1150;
     /** Tahmini içerik bunu aşarsa form kademeli olarak sıkıştırılır (yazılar küçülür, boşluklar daralır). */
     public static final double SAYFA_YUKSEKLIGI_PT = 700;
     /** Bundan kısa formlarda satır içi boşluklar ve imza alanı büyütülerek sayfa daha dolu kullanılır. */
-    static final double KISA_FORM_PT = 660;
+    public static final double KISA_FORM_PT = 660;
     /** Her sıkıştırma kademesinin karşıladığı yaklaşık yükseklik (pt). */
-    static final double KADEME_PT = 150;
+    public static final double KADEME_PT = 150;
 
     private static final Map<String, String> BELGE_TURU_EN = Map.ofEntries(
             Map.entry("Sözleşme", "Agreement"),
@@ -92,7 +92,7 @@ public final class FormYazici {
             Map.entry("Azilname", "Revocation of Power of Attorney"),
             Map.entry("Diğer", "Other"));
 
-    private static final Map<String, String> BEDEL_ETIKETI_EN = Map.of(
+    public static final Map<String, String> BEDEL_ETIKETI_EN = Map.of(
             "Bedel", "Price",
             "Sözleşme Bedeli", "Contract Price",
             "Zeyilnameye Konu Tutar", "Amendment Amount");
@@ -333,7 +333,7 @@ public final class FormYazici {
         }
     }
 
-    private static String belgeTuru(FormVerisi f) {
+    public static String belgeTuru(FormVerisi f) {
         String b = f.belgeTuru == null ? "" : f.belgeTuru.trim();
         if (f.ikiDilli() && !b.contains("/") && BELGE_TURU_EN.containsKey(b)) {
             return b + " / " + BELGE_TURU_EN.get(b);
@@ -627,7 +627,7 @@ public final class FormYazici {
     }
 
     /** 0: sıkıştırma yok; 1–3: yazılar o kadar pt küçülür, boşluklar orantılı daralır. */
-    static int sikistirmaKademesi(double tahmin) {
+    public static int sikistirmaKademesi(double tahmin) {
         if (tahmin <= SAYFA_YUKSEKLIGI_PT) return 0;
         return (int) Math.min(3, Math.ceil((tahmin - SAYFA_YUKSEKLIGI_PT) / KADEME_PT));
     }
@@ -675,7 +675,7 @@ public final class FormYazici {
     }
 
     /** Hücre genişliğine sığan alt çizgi (_) sayısı (11 pt Cambria'da ≈ 112 twip/karakter). */
-    static int imzaCizgisiUzunlugu(int hucre) {
+    public static int imzaCizgisiUzunlugu(int hucre) {
         return Math.max(12, Math.min(40, (hucre - 700) / 112));
     }
 

@@ -17,6 +17,15 @@ Düzenlenebilir dosyalar (uygulamayı yeniden derlemeden)
   assets\logos\*.png      şirket logoları (kalyon-enerji.png zorunlu)
   Değişiklikten sonra: Ayarlar > Yapılandırmayı Yeniden Yükle
 
+Model
+  Varsayılan model Haiku 5.5 (en ucuz). "Analiz Et" yanındaki Model listesinden
+  Sonnet 5.5 seçilebilir; seçim hatırlanır (%APPDATA%\YOBF\tercihler.json).
+
+Önizleme ve PDF
+  Sağdaki "Önizleme" sekmesi formun yaklaşık görünümünü gösterir (tıklayınca büyür).
+  "Onayla ve Word Oluştur" penceresinde "PDF olarak da kaydet" işaretlenirse PDF,
+  bilgisayardaki Microsoft Word ile (yoksa LibreOffice ile) .docx'in yanına kaydedilir.
+
 Kurumsal proxy
   config\ayarlar.json → "proxy": { "host": "proxy.sirket.local", "port": 8080 }
 

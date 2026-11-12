@@ -64,6 +64,10 @@ public class AnaPencere extends JFrame {
     private final JButton analizEt = new JButton("Analiz Et");
     private final JButton wordOlustur = new JButton("Onayla ve Word Oluştur…");
     private final JComboBox<String> formTuruTercihi = new JComboBox<>();
+    private final JComboBox<legal.erk.yobf.config.Ayarlar.ModelSecenegi> modelSecici = new JComboBox<>();
+    private final legal.erk.yobf.config.Tercihler tercihler = legal.erk.yobf.config.Tercihler.varsayilan();
+    private OnizlemePaneli onizleme;
+    private final javax.swing.Timer onizlemeZamanlayici = new javax.swing.Timer(300, e -> onizlemeGuncelle());
     private DuzenlemePaneli panel;
     private JScrollPane panelKaydirma;
     /** Son analizdeki maskeli kaynak metin (doğrulama için). Maskelenen değerler modele gitmez. */
@@ -209,6 +213,19 @@ public class AnaPencere extends JFrame {
         btn.add(kaldir);
         btn.add(temizle);
         btn.add(formTuruTercihi);
+        y.ayarlar().modeller().forEach(modelSecici::addItem);
+        String kayitli = tercihler.model(y.ayarlar().model());
+        for (int i = 0; i < modelSecici.getItemCount(); i++) {
+            if (modelSecici.getItemAt(i).id().equals(kayitli)) modelSecici.setSelectedIndex(i);
+        }
+        modelSecici.setToolTipText("Analizde kullanılacak yapay zekâ modeli (Haiku: en ucuz)");
+        modelSecici.addActionListener(e -> {
+            if (modelSecici.getSelectedItem() instanceof legal.erk.yobf.config.Ayarlar.ModelSecenegi ms) {
+                tercihler.modelAyarla(ms.id());
+            }
+        });
+        btn.add(new JLabel("Model:"));
+        btn.add(modelSecici);
         btn.add(analizEt);
         p.add(btn, BorderLayout.SOUTH);
         return p;
@@ -236,11 +253,35 @@ public class AnaPencere extends JFrame {
         JScrollPane ds = new JScrollPane(dl);
         ds.setBorder(BorderFactory.createTitledBorder("Dikkat edilmesi önerilen hususlar (forma yazılmaz)"));
 
-        JSplitPane s = new JSplitPane(JSplitPane.VERTICAL_SPLIT, us, ds);
-        s.setResizeWeight(0.55);
+        onizleme = new OnizlemePaneli(y.ayarlar());
+        onizleme.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) { buyukOnizleme(); }
+        });
+        JPanel onizlemeSekmesi = new JPanel(new BorderLayout());
+        onizlemeSekmesi.add(onizleme, BorderLayout.CENTER);
+        onizlemeSekmesi.add(new JLabel("<html><small>Yaklaşık görünüm — kesin hali Word çıktısındadır. "
+                + "Büyütmek için tıklayın.</small></html>"), BorderLayout.SOUTH);
+
+        javax.swing.JTabbedPane sekmeler = new javax.swing.JTabbedPane();
+        sekmeler.addTab("Önizleme", onizlemeSekmesi);
+        sekmeler.addTab("Uyarılar", us);
+        sekmeler.addTab("Dikkat hususları", ds);
+        uyarilar.addListDataListener(new javax.swing.event.ListDataListener() {
+            void say() { sekmeler.setTitleAt(1, uyarilar.isEmpty() ? "Uyarılar" : "Uyarılar (" + uyarilar.size() + ")"); }
+            public void intervalAdded(javax.swing.event.ListDataEvent e) { say(); }
+            public void intervalRemoved(javax.swing.event.ListDataEvent e) { say(); }
+            public void contentsChanged(javax.swing.event.ListDataEvent e) { say(); }
+        });
+        dikkat.addListDataListener(new javax.swing.event.ListDataListener() {
+            void say() { sekmeler.setTitleAt(2, dikkat.isEmpty() ? "Dikkat hususları" : "Dikkat hususları (" + dikkat.size() + ")"); }
+            public void intervalAdded(javax.swing.event.ListDataEvent e) { say(); }
+            public void intervalRemoved(javax.swing.event.ListDataEvent e) { say(); }
+            public void contentsChanged(javax.swing.event.ListDataEvent e) { say(); }
+        });
         JPanel p = new JPanel(new BorderLayout());
-        p.add(s, BorderLayout.CENTER);
-        p.setPreferredSize(new Dimension(360, 400));
+        p.add(sekmeler, BorderLayout.CENTER);
+        p.setPreferredSize(new Dimension(400, 400));
+        onizlemeZamanlayici.setRepeats(false);
         return p;
     }
 
@@ -294,6 +335,8 @@ public class AnaPencere extends JFrame {
         for (int i = 0; i < belgeler.size(); i++) dosyalar.add(belgeler.get(i));
         String tercih = formTuruTercihi.getSelectedIndex() > 0 ? (String) formTuruTercihi.getSelectedItem() : null;
         String apiAnahtari = anahtar;
+        String modelId = modelSecici.getSelectedItem() instanceof legal.erk.yobf.config.Ayarlar.ModelSecenegi ms
+                ? ms.id() : y.ayarlar().model();
 
         analizEt.setEnabled(false);
         wordOlustur.setEnabled(false);
@@ -318,7 +361,7 @@ public class AnaPencere extends JFrame {
                 }
                 if (maskelenen > 0) publish(maskelenen + " kişisel veri maskelendi (modele gönderilmedi).");
                 boolean ikiDilli = "YOBF_TR_EN".equals(tercih);
-                try (ClaudeIstemci c = new ClaudeIstemci(y.ayarlar(), UygulamaYolu.prompt("ozet_prompt.md"), apiAnahtari)) {
+                try (ClaudeIstemci c = new ClaudeIstemci(y.ayarlar(), modelId, UygulamaYolu.prompt("ozet_prompt.md"), apiAnahtari)) {
                     OzetSemasi o = c.ozetCikar(maskeli, ikiDilli, this::publish);
                     return new Object[]{o, kaynak.toString(), dosyalar.size()};
                 }
@@ -382,7 +425,27 @@ public class AnaPencere extends JFrame {
         uyarilar.clear();
         l.stream().sorted((a, b) -> b.seviye().compareTo(a.seviye())).forEach(uyarilar::addElement);
         panel.isaretle(l);
+        onizlemeZamanlayici.restart();
         return l;
+    }
+
+    /** Önizlemede gösterilecek form: ekrandaki değerler + otomatik/elle seçilen logo. */
+    private void onizlemeGuncelle() {
+        if (panel == null || onizleme == null) return;
+        FormVerisi f = panel.oku();
+        LogoCozumleyici lc = new LogoCozumleyici(y.sirketler(), UygulamaYolu.logolar());
+        f.logo = lc.coz(f.logoIcinSirketler(), panel.secilenLogo()).logo();
+        onizleme.goster(f);
+    }
+
+    private void buyukOnizleme() {
+        javax.swing.JDialog d = new javax.swing.JDialog(this, "Önizleme (yaklaşık)", false);
+        OnizlemePaneli buyuk = new OnizlemePaneli(y.ayarlar());
+        buyuk.goster(onizleme.form());
+        d.add(buyuk);
+        d.setSize(720, Math.min(1000, getGraphicsConfiguration().getBounds().height - 60));
+        d.setLocationRelativeTo(this);
+        d.setVisible(true);
     }
 
     private void wordOlustur() {
@@ -415,9 +478,16 @@ public class AnaPencere extends JFrame {
                 .append(f.logo == null ? "(yok)" : f.logo.getFileName()).append("<br>İmzacı: ")
                 .append(f.anaImzacilar.size()).append(f.ekOnayAcik ? " + 1 ek onay" : "").append("</p>");
         m.append("<p>Ekrandaki tüm alanları kontrol ettiğinizi ve forma yazılmasını onaylıyor musunuz?</p></body></html>");
-        int onay = JOptionPane.showConfirmDialog(this, m.toString(), "Onay",
+        javax.swing.JCheckBox pdfKutusu = new javax.swing.JCheckBox(
+                "PDF olarak da kaydet (bilgisayarda Microsoft Word veya LibreOffice yüklü olmalı)", tercihler.pdfDeOlustur());
+        JPanel onayPaneli = new JPanel(new BorderLayout(4, 10));
+        onayPaneli.add(new JLabel(m.toString()), BorderLayout.CENTER);
+        onayPaneli.add(pdfKutusu, BorderLayout.SOUTH);
+        int onay = JOptionPane.showConfirmDialog(this, onayPaneli, "Onay",
                 JOptionPane.YES_NO_OPTION, kirmizi > 0 ? JOptionPane.WARNING_MESSAGE : JOptionPane.QUESTION_MESSAGE);
         if (onay != JOptionPane.YES_OPTION) return;
+        boolean pdfDe = pdfKutusu.isSelected();
+        tercihler.pdfDeOlusturAyarla(pdfDe);
 
         // 3) Kaydet
         FormHazirlayici h = new FormHazirlayici(y);
@@ -449,13 +519,53 @@ public class AnaPencere extends JFrame {
                 durum("Uyarı: işlem günlüğü yazılamadı — " + e.getMessage());
             }
             durum("Kaydedildi: " + hedef);
-            if (JOptionPane.showConfirmDialog(this, "Form oluşturuldu:\n" + hedef + "\n\nŞimdi açılsın mı?", "Tamamlandı",
+            if (pdfDe) {
+                pdfOlustur(hedef);
+            } else if (JOptionPane.showConfirmDialog(this, "Form oluşturuldu:\n" + hedef + "\n\nŞimdi açılsın mı?", "Tamamlandı",
                     JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE) == JOptionPane.YES_OPTION) {
                 ac(hedef);
             }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Word dosyası yazılamadı:\n" + e.getMessage(), "Hata", JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    /** Word (yoksa LibreOffice) ile .docx'ten PDF üretir; arka planda çalışır. */
+    private void pdfOlustur(Path docx) {
+        wordOlustur.setEnabled(false);
+        durum("PDF oluşturuluyor (Word açılıyor, birkaç saniye sürebilir)…");
+        new SwingWorker<java.util.Optional<legal.erk.yobf.render.PdfDonusturucu.Sonuc>, Void>() {
+            @Override protected java.util.Optional<legal.erk.yobf.render.PdfDonusturucu.Sonuc> doInBackground() throws Exception {
+                return legal.erk.yobf.render.PdfDonusturucu.donustur(docx);
+            }
+
+            @Override protected void done() {
+                wordOlustur.setEnabled(true);
+                try {
+                    var sonuc = get();
+                    if (sonuc.isEmpty()) {
+                        durum("PDF oluşturulamadı: Word veya LibreOffice bulunamadı.");
+                        JOptionPane.showMessageDialog(AnaPencere.this, "Word belgesi oluşturuldu:\n" + docx
+                                + "\n\nPDF için bilgisayarda Microsoft Word veya LibreOffice bulunamadı.\n"
+                                + "PDF'i Word'de 'Farklı Kaydet → PDF' ile alabilirsiniz.", "PDF", JOptionPane.WARNING_MESSAGE);
+                        return;
+                    }
+                    Path pdf = sonuc.get().pdf();
+                    durum("Kaydedildi: " + docx.getFileName() + " ve " + pdf.getFileName());
+                    Object[] secenekler = {"PDF'i aç", "Word'ü aç", "Kapat"};
+                    int s = JOptionPane.showOptionDialog(AnaPencere.this, "Form oluşturuldu:\n" + docx + "\n" + pdf,
+                            "Tamamlandı", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, secenekler, secenekler[0]);
+                    if (s == 0) ac(pdf);
+                    else if (s == 1) ac(docx);
+                } catch (ExecutionException e) {
+                    durum("PDF oluşturulamadı: " + e.getCause().getMessage());
+                    JOptionPane.showMessageDialog(AnaPencere.this, "Word belgesi oluşturuldu ama PDF'e çevrilemedi:\n"
+                            + e.getCause().getMessage(), "PDF", JOptionPane.WARNING_MESSAGE);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }.execute();
     }
 
     private void anahtarGir() {

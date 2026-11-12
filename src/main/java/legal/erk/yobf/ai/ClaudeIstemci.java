@@ -45,11 +45,18 @@ public final class ClaudeIstemci implements AutoCloseable {
     private static final String YEDEK_MODEL_BETA = "server-side-fallback-2026-07-01";
 
     private final Ayarlar ayarlar;
+    private final Ayarlar.ModelSecenegi model;
     private final String sistemTalimati;
     private final AnthropicClient client;
 
     public ClaudeIstemci(Ayarlar ayarlar, Path promptDosyasi, String apiAnahtari) throws IOException {
+        this(ayarlar, ayarlar.model(), promptDosyasi, apiAnahtari);
+    }
+
+    /** @param modelId arayüzde seçilen model (ayarlar.json → modeller) */
+    public ClaudeIstemci(Ayarlar ayarlar, String modelId, Path promptDosyasi, String apiAnahtari) throws IOException {
         this.ayarlar = ayarlar;
+        this.model = ayarlar.modelSecenegi(modelId == null || modelId.isBlank() ? ayarlar.model() : modelId);
         this.sistemTalimati = Files.readString(promptDosyasi, StandardCharsets.UTF_8)
                 .replace("{{KONU_MAX}}", String.valueOf(ayarlar.konuMaxKarakter()));
         AnthropicOkHttpClient.Builder b = AnthropicOkHttpClient.builder()
@@ -69,7 +76,7 @@ public final class ClaudeIstemci implements AutoCloseable {
 
     /** Özet + kısaltma denemeleri. ilerleme: arayüzde durum çubuğu için. */
     public OzetSemasi ozetCikar(List<Belge> maskeliBelgeler, boolean ikiDilli, Consumer<String> ilerleme) throws ModelHatasi {
-        ilerleme.accept("Model çağrılıyor (" + ayarlar.model() + ")…");
+        ilerleme.accept("Model çağrılıyor (" + model + ")…");
         OzetSemasi o = cagir(OzetSemasi.class, kullaniciMesaji(maskeliBelgeler, ikiDilli), 16000);
 
         int sinir = ayarlar.konuMaxKarakter();
@@ -86,15 +93,7 @@ public final class ClaudeIstemci implements AutoCloseable {
     }
 
     private <T> T cagir(Class<T> tur, String kullaniciMesaji, long maxTokens) throws ModelHatasi {
-        MessageCreateParams.Builder b = MessageCreateParams.builder()
-                .model(ayarlar.model())
-                .maxTokens(maxTokens)
-                .system(sistemTalimati)
-                .addUserMessage(kullaniciMesaji);
-        if (ayarlar.sunucuTarafiYedekModel()) {
-            b.addBeta(YEDEK_MODEL_BETA).fallbacksDefault();
-        }
-        StructuredMessageCreateParams<T> params = b.outputConfig(tur).build();
+        StructuredMessageCreateParams<T> params = istek(tur, kullaniciMesaji, maxTokens);
         try {
             StructuredMessage<T> m = client.beta().messages().create(params);
             BetaStopReason sr = m.stopReason().orElse(null);
@@ -124,6 +123,19 @@ public final class ClaudeIstemci implements AutoCloseable {
         } catch (RuntimeException e) {
             throw new ModelHatasi("Bağlantı/yanıt hatası: " + e.getMessage(), e);
         }
+    }
+
+    /** İstek gövdesi. Sunucu tarafı yedek model yalnızca destekleyen modellerde istenir (Haiku 5.5'te yok). */
+    <T> StructuredMessageCreateParams<T> istek(Class<T> tur, String kullaniciMesaji, long maxTokens) {
+        MessageCreateParams.Builder b = MessageCreateParams.builder()
+                .model(model.id())
+                .maxTokens(maxTokens)
+                .system(sistemTalimati)
+                .addUserMessage(kullaniciMesaji);
+        if (ayarlar.sunucuTarafiYedekModel() && model.yedekModel()) {
+            b.addBeta(YEDEK_MODEL_BETA).fallbacksDefault();
+        }
+        return b.outputConfig(tur).build();
     }
 
     String kullaniciMesaji(List<Belge> belgeler, boolean ikiDilli) {
@@ -179,7 +191,7 @@ public final class ClaudeIstemci implements AutoCloseable {
                 + (ikiDilli && o.konuEn() != null ? "\n\nkonu_en:\n" + o.konuEn() : "");
     }
 
-    public Optional<String> model() { return Optional.ofNullable(ayarlar.model()); }
+    public Optional<String> model() { return Optional.ofNullable(model.id()); }
 
     @Override
     public void close() {

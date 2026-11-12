@@ -34,6 +34,9 @@ GitHub Release'e de ekler). Zip açılıp `YOBF-Otomator.exe` çalıştırılır
 | `prompts/ozet_prompt.md` | modele verilen sistem talimatı |
 | `assets/logos/*.png` | logolar (`kalyon-enerji.png` zorunlu varsayılan) |
 
+Varsayılan model `claude-haiku-5-5`; `ayarlar.json → modeller` listesindeki modeller arayüzden seçilir.
+Sağ panelde canlı önizleme vardır; onayda istenirse Word (yoksa LibreOffice) ile PDF de üretilir.
+
 API anahtarı repoda tutulmaz: `ANTHROPIC_API_KEY` ortam değişkeni veya
 `%APPDATA%\YOBF\anahtar.txt` (uygulamada *Ayarlar › API Anahtarı…*).
 
@@ -44,11 +47,11 @@ API anahtarı repoda tutulmaz: `ANTHROPIC_API_KEY` ortam değişkeni veya
 ```
 src/main/java/legal/erk/yobf/
 ├─ App.java
-├─ ui/       AnaPencere, DuzenlemePaneli, ImzaciPaneli
+├─ ui/       AnaPencere, DuzenlemePaneli, ImzaciPaneli, EkSatirlarPaneli, OnizlemePaneli
 ├─ extract/  PdfMetin, DocxMetin, Maskeleme, BelgeOkuyucu
 ├─ ai/       ClaudeIstemci, OzetSemasi, ApiAnahtari
 ├─ rules/    LogoCozumleyici, UnvanNormalizer, KarakterSayaci, Dogrulayici, FormHazirlayici, TurkSayi, TarihKontrol
-├─ render/   FormYazici (Apache POI)
+├─ render/   FormYazici (Apache POI), PdfDonusturucu (Word/LibreOffice ile PDF)
 ├─ config/   ayarlar/şirket/imzacı kayıtları, uygulama klasörü
 ├─ model/    FormVerisi, SozlesmeGrubu, Bedel
 └─ log/      IslemGunlugu
