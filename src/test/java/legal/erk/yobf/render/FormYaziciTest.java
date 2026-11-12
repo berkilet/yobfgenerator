@@ -191,6 +191,35 @@ class FormYaziciTest {
     }
 
     @Test
+    void uzunFormSikistirilir() throws Exception {
+        FormVerisi f = yobf();
+        f.konuTr = f.konuTr.repeat(3);
+        f.notEtiketi = "Müşavirliğimizin Notu:";
+        f.notMetni = ("Avukata yapılacak ödemeler bakımından sözleşme bedelinin son kısmının ilk derece mahkemesi "
+                + "kararlarının alınmasına, kalan kısmının ise kararların kesinleşmesine bağlanması önerilmiştir.\n").repeat(4);
+        f.imzasinaSunulacak.add("Sn. Haluk KALYONCU");
+        f.anaImzacilar.addAll(imzacilar(5));
+        f.ekOnayAcik = true;
+        f.ekOnayImzaci = y.imzacilar().bul("fkolmek").orElseThrow();
+        assertTrue(yazici.tahminiYukseklik(f) > FormYazici.SAYFA_YUKSEKLIGI_PT);
+        assertTrue(yazici.tahminiYukseklik(yobf()) < FormYazici.SAYFA_YUKSEKLIGI_PT);
+        yazVeOku(f, "uzun_form.docx");
+    }
+
+    @Test
+    void imzaCizgisiAyriSatirda() throws Exception {
+        FormVerisi f = yobf();
+        f.anaImzacilar.addAll(imzacilar(3));
+        String m = yazVeOku(f, "imza_cizgisi.docx");
+        assertTrue(m.contains("_".repeat(15)));
+        try (InputStream in = Files.newInputStream(CIKTI.resolve("imza_cizgisi.docx")); XWPFDocument d = new XWPFDocument(in)) {
+            XWPFTable imza = d.getTables().get(1);
+            assertEquals(2, imza.getRows().size(), "ad/unvan satırı + çizgi satırı");
+            assertTrue(imza.getRow(1).getCell(0).getText().startsWith("____"));
+        }
+    }
+
+    @Test
     void dosyaAdi() {
         FormVerisi f = yobf();
         String ad = FormYazici.dosyaAdi(f, s -> s.startsWith("Kalyon"), LocalDate.of(2026, 10, 20));

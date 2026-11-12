@@ -8,7 +8,6 @@ import legal.erk.yobf.model.Satirlar;
 import legal.erk.yobf.model.FormVerisi;
 import legal.erk.yobf.model.SozlesmeGrubu;
 import org.apache.poi.util.Units;
-import org.apache.poi.xwpf.usermodel.Borders;
 import org.apache.poi.xwpf.usermodel.Document;
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
 import org.apache.poi.xwpf.usermodel.TableRowAlign;
@@ -68,7 +67,17 @@ public final class FormYazici {
     static final double LOGO_YUKSEKLIK_CM = 2.2;
 
     static final String FONT = "Cambria";
-    static final int GOVDE = 11, ACIKLAMA = 9, BASLIK = 14;
+    static final int GOVDE = 12, ACIKLAMA = 10, BASLIK = 16;
+    /** İmza bloğu: örnek formlardaki gibi ad büyük ve kalın, unvan okunur büyüklükte italik. */
+    static final int IMZACI_AD = 14, IMZACI_UNVAN = 11, IMZA_BASLIK = 15;
+    /** İmza için unvan ile imza çizgisi arasında bırakılan boşluk (twip; ≈ 2 cm). */
+    static final int IMZA_BOSLUGU = 1150;
+    /** Tahmini içerik bunu aşarsa form kademeli olarak sıkıştırılır (yazılar küçülür, boşluklar daralır). */
+    public static final double SAYFA_YUKSEKLIGI_PT = 700;
+    /** Bundan kısa formlarda satır içi boşluklar ve imza alanı büyütülerek sayfa daha dolu kullanılır. */
+    static final double KISA_FORM_PT = 660;
+    /** Her sıkıştırma kademesinin karşıladığı yaklaşık yükseklik (pt). */
+    static final double KADEME_PT = 150;
 
     private static final Map<String, String> BELGE_TURU_EN = Map.ofEntries(
             Map.entry("Sözleşme", "Agreement"),
@@ -111,6 +120,10 @@ public final class FormYazici {
             baslik(doc, f);
             anaTablo(doc, f);
             imzaBlogu(doc, f);
+            double tahmin = tahminiYukseklik(f);
+            int kademe = sikistirmaKademesi(tahmin);
+            if (kademe > 0) sikistir(doc, kademe);
+            else if (tahmin < KISA_FORM_PT) genislet(doc);
             doc.write(out);
         }
     }
@@ -149,7 +162,7 @@ public final class FormYazici {
         var sp = ppr.addNewSpacing();
         sp.setAfter(BigInteger.ZERO);
         sp.setBefore(BigInteger.ZERO);
-        sp.setLine(BigInteger.valueOf(240));
+        sp.setLine(BigInteger.valueOf(264)); // 1,1 satır aralığı: sayfa daha dolu ve okunaklı
         sp.setLineRule(org.openxmlformats.schemas.wordprocessingml.x2006.main.STLineSpacingRule.AUTO);
         styles.setStyles(ct);
     }
@@ -236,7 +249,7 @@ public final class FormYazici {
         XWPFTable t = doc.createTable(1, 3);
         sabitTablo(t, new int[]{ETIKET_SUTUN, AYRAC_SUTUN, DEGER_SUTUN});
         kenarliklar(t, true);
-        t.setCellMargins(70, 80, 70, 80);
+        t.setCellMargins(110, 100, 110, 100);
         boolean en = f.ikiDilli();
         Tablo tb = new Tablo(t, f);
 
@@ -489,12 +502,7 @@ public final class FormYazici {
         List<Imzaci> imzacilar = new ArrayList<>(f.anaImzacilar.stream().filter(i -> i != null && !i.ad().isBlank()).toList());
         if (imzacilar.size() > ib.anaImzaciMax()) imzacilar = imzacilar.subList(0, ib.anaImzaciMax());
 
-        bosParagraf(doc, 2);
-        XWPFParagraph h = doc.createParagraph();
-        h.setAlignment(ParagraphAlignment.CENTER);
-        birlikte(h);
-        run(h, en ? ib.anaBaslik() + " / " + ib.anaBaslikEn() : ib.anaBaslik(), true, false, true, 13);
-        bosParagraf(doc, 1);
+        baslikParagrafi(doc, en ? ib.anaBaslik() + " / " + ib.anaBaslikEn() : ib.anaBaslik(), 560);
 
         if (!imzacilar.isEmpty()) {
             List<Integer> satirlar = ib.satirlar(imzacilar.size());
@@ -502,61 +510,173 @@ public final class FormYazici {
             int hucre = ICERIK / Math.max(2, enCok);
             int idx = 0;
             for (int s = 0; s < satirlar.size(); s++) {
-                if (s > 0) bosParagraf(doc, 1);
+                if (s > 0) aralik(doc, 360);
                 imzaSatiri(doc, imzacilar.subList(idx, idx + satirlar.get(s)), hucre, en);
                 idx += satirlar.get(s);
             }
         }
 
         if (f.ekOnayAcik && f.ekOnayImzaci != null && !f.ekOnayImzaci.ad().isBlank()) {
-            bosParagraf(doc, 2);
-            XWPFParagraph eh = doc.createParagraph();
-            eh.setAlignment(ParagraphAlignment.CENTER);
-            birlikte(eh);
             String b = nz(f.ekOnayBaslik, ib.ekOnayBaslik());
-            run(eh, en ? b + " / " + ib.ekOnayBaslikEn() : b, true, false, true, 13);
-            bosParagraf(doc, 1);
+            baslikParagrafi(doc, en ? b + " / " + ib.ekOnayBaslikEn() : b, 480);
             imzaSatiri(doc, List.of(f.ekOnayImzaci), ICERIK / 2, en);
         }
     }
 
+    /** "UYGUNDUR" / "ONAY" başlığı: kalın, altı çizili, ortalı; önünde verilen boşluk. */
+    private static void baslikParagrafi(XWPFDocument doc, String metin, int onceBosluk) {
+        XWPFParagraph h = doc.createParagraph();
+        h.setAlignment(ParagraphAlignment.CENTER);
+        h.setSpacingBefore(onceBosluk);
+        h.setSpacingAfter(300);
+        birlikte(h);
+        run(h, metin, true, false, true, IMZA_BASLIK);
+    }
+
+    private static void aralik(XWPFDocument doc, int twip) {
+        XWPFParagraph p = doc.createParagraph();
+        p.setSpacingBefore(twip);
+        birlikte(p);
+    }
+
+    /**
+     * İki satırlı kenarlıksız tablo: üst satırda Ad SOYAD (kalın) + unvan (italik), alt satırda
+     * imza boşluğu ve imzanın üzerine atılacağı düz çizgi (_____). Çizgiler ayrı satırda olduğu için
+     * unvanı uzun/kısa olan imzacılarda da aynı hizada durur.
+     */
     private static void imzaSatiri(XWPFDocument doc, List<Imzaci> kisiler, int hucre, boolean en) {
         int n = kisiler.size();
-        XWPFTable t = doc.createTable(1, n);
+        XWPFTable t = doc.createTable(2, n);
         int[] g = new int[n];
         java.util.Arrays.fill(g, hucre);
         sabitTablo(t, g);
         kenarliklar(t, false);
         t.setTableAlignment(TableRowAlign.CENTER);
-        t.setCellMargins(0, 60, 0, 60);
-        XWPFTableRow r = t.getRow(0);
-        r.setCantSplitRow(true);
+        t.setCellMargins(0, 80, 0, 80);
+        XWPFTableRow adSatiri = t.getRow(0);
+        XWPFTableRow cizgiSatiri = t.getRow(1);
+        adSatiri.setCantSplitRow(true);
+        cizgiSatiri.setCantSplitRow(true);
+        String cizgi = "_".repeat(imzaCizgisiUzunlugu(hucre));
         for (int i = 0; i < n; i++) {
             Imzaci k = kisiler.get(i);
-            XWPFTableCell c = r.getCell(i);
+            XWPFTableCell c = adSatiri.getCell(i);
+            c.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.TOP);
             XWPFParagraph ad = ilkParagraf(c);
             ad.setAlignment(ParagraphAlignment.CENTER);
             birlikte(ad);
-            run(ad, k.ad(), true, false, false, GOVDE);
+            run(ad, k.ad(), true, false, false, IMZACI_AD);
             if (!k.unvan().isBlank()) {
                 XWPFParagraph u = c.addParagraph();
                 u.setAlignment(ParagraphAlignment.CENTER);
                 birlikte(u);
-                run(u, k.unvan(), false, true, false, ACIKLAMA);
+                run(u, k.unvan(), false, true, false, IMZACI_UNVAN);
             }
             if (en && !k.unvanEn().isBlank() && !k.unvanEn().equals(k.unvan())) {
                 XWPFParagraph u = c.addParagraph();
                 u.setAlignment(ParagraphAlignment.CENTER);
                 birlikte(u);
-                run(u, k.unvanEn(), false, true, false, ACIKLAMA);
+                run(u, k.unvanEn(), false, true, false, IMZACI_UNVAN);
             }
-            for (int b = 0; b < 4; b++) birlikte(c.addParagraph());
-            XWPFParagraph cizgi = c.addParagraph();
-            cizgi.setBorderBottom(Borders.SINGLE);
-            cizgi.setIndentationLeft(150);
-            cizgi.setIndentationRight(150);
+            XWPFParagraph cp = ilkParagraf(cizgiSatiri.getCell(i));
+            cp.setAlignment(ParagraphAlignment.CENTER);
+            cp.setSpacingBefore(IMZA_BOSLUGU);
+            run(cp, cizgi, false, false, false, GOVDE);
         }
-        hucreGenislikleri(r, g);
+        hucreGenislikleri(adSatiri, g);
+        hucreGenislikleri(cizgiSatiri, g);
+    }
+
+    // ------------------------------------------------------------------ tek sayfaya sığdırma
+
+    /** Formun yaklaşık yüksekliği (pt), varsayılan yazı boyutlarıyla. Kaba ama kararlı bir tahmin. */
+    public double tahminiYukseklik(FormVerisi f) {
+        final double satir = GOVDE * 1.1 * 1.2;          // bir metin satırı
+        final double hucreBasina = 2 * satir + 11;        // etiketi iki satıra kırılan tablo satırı
+        final int kolonKarakter = 80;                     // değer sütununa sığan karakter
+        double h = 62 + 2 * BASLIK + 30;                   // logo + başlık
+        if (f.ikiDilli()) h += BASLIK * 1.4;
+
+        int tabloSatiri = 4 + (f.azilname() ? 3 : f.vekaletname() ? 4 : 1);
+        if (!f.imzasinaSunulacak.isEmpty()) tabloSatiri++;
+        tabloSatiri += (int) f.ekSatirlar.stream().filter(e -> !e.alt()).count();
+        h += tabloSatiri * hucreBasina;
+
+        int metinSatiri = 0;
+        for (SozlesmeGrubu g : f.sozlesmeler) metinSatiri += 1 + g.taraflar.size() + g.bedeller.size() + 1;
+        metinSatiri += satirSayisi(f.konuTr, kolonKarakter) + 1;
+        if (f.ikiDilli()) metinSatiri += satirSayisi(f.konuEn, kolonKarakter) + 1;
+        metinSatiri += (int) Math.ceil(satirSayisi(f.notMetni, (int) (kolonKarakter * 1.2)) * 0.85);
+        metinSatiri += f.sirketler.size() + f.imzasinaSunulacak.size();
+        for (EkSatir e : f.ekSatirlar) metinSatiri += satirSayisi(e.deger(), kolonKarakter) + (e.alt() ? 1 : 0);
+        h += Math.max(0, metinSatiri - 2) * satir;
+
+        int imzaci = (int) f.anaImzacilar.stream().filter(i -> i != null && !i.ad().isBlank()).count();
+        int imzaSatiri = imzaci == 0 ? 0 : ayarlar.imzaBlogu().satirlar(Math.min(imzaci, 5)).size();
+        if (f.ekOnayAcik) imzaSatiri++;
+        double imzaBlogu = IMZACI_AD * 1.3 + 2 * IMZACI_UNVAN * 1.3 + IMZA_BOSLUGU / 20.0 + satir;
+        h += 28 + IMZA_BASLIK * 2 + imzaSatiri * imzaBlogu + (f.ekOnayAcik ? 30 : 0);
+        return h;
+    }
+
+    private static int satirSayisi(String metin, int kolon) {
+        if (metin == null || metin.isBlank()) return 0;
+        int n = 0;
+        for (String s : metin.split("\\R")) n += Math.max(1, (int) Math.ceil(s.length() / (double) kolon));
+        return n;
+    }
+
+    /** 0: sıkıştırma yok; 1–3: yazılar o kadar pt küçülür, boşluklar orantılı daralır. */
+    static int sikistirmaKademesi(double tahmin) {
+        if (tahmin <= SAYFA_YUKSEKLIGI_PT) return 0;
+        return (int) Math.min(3, Math.ceil((tahmin - SAYFA_YUKSEKLIGI_PT) / KADEME_PT));
+    }
+
+    /** Kısa formlar: tablo satırları daha ferah, imza alanı daha geniş. */
+    static void genislet(XWPFDocument doc) {
+        for (XWPFParagraph p : doc.getParagraphs()) {
+            if (p.getSpacingBefore() > 0) p.setSpacingBefore((int) (p.getSpacingBefore() * 1.4));
+        }
+        for (XWPFTable t : doc.getTables()) {
+            if (t.getRow(0).getTableCells().size() == 3 && t.getRows().size() > 2) {
+                t.setCellMargins(180, 100, 180, 100);
+            }
+            for (XWPFTableRow r : t.getRows()) {
+                for (XWPFTableCell c : r.getTableCells()) {
+                    for (XWPFParagraph p : c.getParagraphs()) {
+                        if (p.getSpacingBefore() > 0) p.setSpacingBefore((int) (p.getSpacingBefore() * 1.35));
+                    }
+                }
+            }
+        }
+    }
+
+    static void sikistir(XWPFDocument doc, int kademe) {
+        double oran = Math.pow(0.72, kademe);
+        for (XWPFParagraph p : doc.getParagraphs()) sikistir(p, kademe, oran);
+        for (XWPFTable t : doc.getTables()) {
+            if (t.getRow(0).getTableCells().size() == 3 && t.getRows().size() > 2) {
+                int dikey = Math.max(30, (int) (110 * oran));
+                t.setCellMargins(dikey, 100, dikey, 100);
+            }
+            for (XWPFTableRow r : t.getRows()) {
+                for (XWPFTableCell c : r.getTableCells()) for (XWPFParagraph p : c.getParagraphs()) sikistir(p, kademe, oran);
+            }
+        }
+    }
+
+    private static void sikistir(XWPFParagraph p, int kademe, double oran) {
+        for (XWPFRun r : p.getRuns()) {
+            Double fs = r.getFontSizeAsDouble();
+            if (fs != null) r.setFontSize(Math.max(fs >= 11 ? 9 : 8, fs - kademe));
+        }
+        if (p.getSpacingBefore() > 0) p.setSpacingBefore((int) (p.getSpacingBefore() * oran));
+        if (p.getSpacingAfter() > 0) p.setSpacingAfter((int) (p.getSpacingAfter() * oran));
+    }
+
+    /** Hücre genişliğine sığan alt çizgi (_) sayısı (11 pt Cambria'da ≈ 112 twip/karakter). */
+    static int imzaCizgisiUzunlugu(int hucre) {
+        return Math.max(12, Math.min(40, (hucre - 700) / 112));
     }
 
     // ------------------------------------------------------------------ yardımcılar

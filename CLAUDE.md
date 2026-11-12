@@ -157,7 +157,9 @@ Form altındaki **UYGUNDUR** bloğu:
 ## 9. Çıktı biçimi (.docx)
 
 - A4, dar kenar boşlukları; tüm form kalın siyah çerçeve içinde (örneklerdeki gibi).
-- Yazı tipi: Cambria (başlık ve etiketler kalın), gövde 11 pt, açıklama satırları 9 pt italik.
+- Yazı tipi: Cambria (başlık ve etiketler kalın), gövde 12 pt, açıklama satırları 10 pt italik.
+- İmza bloğu: Ad SOYAD 14 pt kalın, unvan 11 pt italik; altında ≈ 2 cm imza boşluğu ve imzanın üzerine atılacağı `_____` çizgisi (çizgiler ayrı tablo satırında, aynı hizada).
+- Sayfa kullanımı: form tek sayfaya sığmalı. Kısa formlarda satır boşlukları ve imza alanı büyütülür; uzun formlarda (uzun konu/not, 4–5 imzacı + ek onay) yazılar ve boşluklar kademeli küçültülür (`FormYazici.tahminiYukseklik`).
 - İki sütunlu tablo: etiket sütunu ≈ %28, `:` ayracı, değer sütunu; satır ayırıcı ince yatay çizgiler.
 - Konu metni iki yana yaslı.
 - Alt alan etiketleri (`Taraflar:`, `Konu:`, `Bedel:`) kalın + altı çizili.
