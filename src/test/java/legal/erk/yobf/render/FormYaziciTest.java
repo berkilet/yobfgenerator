@@ -4,6 +4,8 @@ import legal.erk.yobf.TestVerisi;
 import legal.erk.yobf.config.Imzaci;
 import legal.erk.yobf.config.Yapilandirma;
 import legal.erk.yobf.model.Bedel;
+import legal.erk.yobf.model.EkSatir;
+import legal.erk.yobf.model.Satirlar;
 import legal.erk.yobf.model.FormVerisi;
 import legal.erk.yobf.model.SozlesmeGrubu;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
@@ -150,6 +152,42 @@ class FormYaziciTest {
         assertTrue(m.contains("Melet Enerji Elektrik Üretim ve Ticaret A.Ş."));
         assertEquals(tur.equals("VEKALETNAME"), m.contains("Sona Erme Tarihi"));
         assertTrue(m.contains("Not: Örnek not."));
+    }
+
+    @Test
+    void satirlarDisaridaBirakilabilir() throws Exception {
+        FormVerisi f = yobf();
+        f.imzasinaSunulacak.add("Sn. Haluk KALYONCU");
+        f.notMetni = "Gizli not.";
+        f.anaImzacilar.addAll(imzacilar(2));
+        f.gizliSatirlar.addAll(List.of(Satirlar.IMZASINA_SUNULACAK, Satirlar.BEDEL, Satirlar.NOT, Satirlar.TALEP_EDEN));
+        String m = yazVeOku(f, "gizli_satirlar.docx");
+        assertFalse(m.contains("İmzasına Sunulacak Yetkili"));
+        assertFalse(m.contains("Haluk"));
+        assertFalse(m.contains("Zeyilnameye Konu Tutar"));
+        assertFalse(m.contains("Gizli not."));
+        assertFalse(m.contains("Belgeyi Talep Eden"));
+        assertTrue(m.contains("Taraflar:"));
+        assertTrue(m.contains("Konu:"));
+    }
+
+    @Test
+    void satirVeAltSatirEklenebilir() throws Exception {
+        FormVerisi f = yobf();
+        f.anaImzacilar.addAll(imzacilar(2));
+        f.ekSatirlar.add(new EkSatir(false, Satirlar.BELGE_TURU, "Proje", "Karapınar-2 GES"));
+        f.ekSatirlar.add(new EkSatir(false, Satirlar.SON, "Ekler", "1) Sözleşme\n2) Teklif"));
+        f.ekSatirlar.add(new EkSatir(true, Satirlar.KONU, "Süre", "12 ay"));
+        f.ekSatirlar.add(new EkSatir(true, Satirlar.TARIH, "", "(imza tarihi)"));
+        String m = yazVeOku(f, "ek_satirlar.docx");
+        assertTrue(m.contains("Süre: 12 ay"));
+        assertTrue(m.indexOf("Belge Türü") < m.indexOf("Proje") && m.indexOf("Proje") < m.indexOf("Belgeyi Talep Eden"));
+        assertTrue(m.contains("(imza tarihi)"));
+        assertTrue(m.indexOf("Ekler") > m.indexOf("Belgenin Konusu"));
+        try (InputStream in = Files.newInputStream(CIKTI.resolve("ek_satirlar.docx")); XWPFDocument d = new XWPFDocument(in)) {
+            // Tarih, Proje, Belge Türü, Talep Eden, İmzaya Sunan, Konu, Ekler = 7 satır
+            assertEquals(7, d.getTables().get(0).getRows().size());
+        }
     }
 
     @Test

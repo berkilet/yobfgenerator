@@ -43,6 +43,13 @@ public class FormVerisi {
 
     public Path logo;
 
+    /** Forma dahil edilmeyecek satırlar (Satirlar anahtarları). */
+    public final java.util.Set<String> gizliSatirlar = new java.util.HashSet<>();
+    /** Kullanıcının eklediği satırlar ve alt satırlar. */
+    public final List<EkSatir> ekSatirlar = new ArrayList<>();
+
+    public boolean dahil(String satir) { return !gizliSatirlar.contains(satir); }
+
     public boolean ikiDilli() { return "YOBF_TR_EN".equals(formTuru); }
     public boolean azilname() { return "AZILNAME".equals(formTuru); }
     public boolean vekaletname() { return "VEKALETNAME".equals(formTuru); }

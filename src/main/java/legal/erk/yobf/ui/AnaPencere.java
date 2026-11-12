@@ -82,7 +82,7 @@ public class AnaPencere extends JFrame {
         panel.degisinceCalistir(this::canliDogrula);
         panelKaydirma = new JScrollPane(panel);
         panelKaydirma.getVerticalScrollBar().setUnitIncrement(16);
-        panelKaydirma.setBorder(BorderFactory.createTitledBorder("Düzenleme"));
+        panelKaydirma.setBorder(BorderFactory.createTitledBorder("Düzenleme — kutucuğu işaretli satırlar forma dahil edilir"));
 
         JSplitPane bolme = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, panelKaydirma, yanPanel());
         bolme.setResizeWeight(0.7);
@@ -348,6 +348,10 @@ public class AnaPencere extends JFrame {
                     f.ekOnayAcik = mevcut.ekOnayAcik;
                     f.ekOnayBaslik = mevcut.ekOnayBaslik;
                     f.ekOnayImzaci = mevcut.ekOnayImzaci;
+                    f.gizliSatirlar.addAll(mevcut.gizliSatirlar);
+                    f.ekSatirlar.addAll(mevcut.ekSatirlar);
+                    f.notMetni = mevcut.notMetni;
+                    f.notEtiketi = mevcut.notEtiketi;
                     if (!mevcut.imzayaSunanDepartman.isBlank()) f.imzayaSunanDepartman = mevcut.imzayaSunanDepartman;
                     panel.yukle(f);
                     dikkat.clear();

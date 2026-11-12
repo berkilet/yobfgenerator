@@ -5,6 +5,7 @@ import legal.erk.yobf.config.SirketKaydi;
 import legal.erk.yobf.config.Sirketler;
 import legal.erk.yobf.model.Bedel;
 import legal.erk.yobf.model.FormVerisi;
+import legal.erk.yobf.model.Satirlar;
 import legal.erk.yobf.model.SozlesmeGrubu;
 
 import java.math.BigDecimal;
@@ -36,7 +37,9 @@ public final class Dogrulayici {
         Set<BigDecimal> kaynakSayilar = kaynakMetin == null ? Set.of() : TurkSayi.metindekiSayilar(kaynakMetin);
 
         // 3. Tarih
-        if (form.tarih == null || form.tarih.isBlank()) {
+        if (!form.dahil(Satirlar.TARIH)) {
+            // Tarih satırı forma dahil edilmedi
+        } else if (form.tarih == null || form.tarih.isBlank()) {
             u.add(Uyari.kirmizi("Tarih", "Tarih boş."));
         } else if (!TarihKontrol.gecerliMi(form.tarih)) {
             u.add(Uyari.kirmizi("Tarih", "'" + form.tarih + "' GG.AA.YYYY biçiminde geçerli bir tarih değil."));
@@ -73,13 +76,15 @@ public final class Dogrulayici {
         // 4. Konu karakter sayımı
         int sinir = ayarlar.konuMaxKarakter();
         int n = KarakterSayaci.say(form.konuTr);
-        if (form.konuTr == null || form.konuTr.isBlank()) {
+        if (!form.dahil(Satirlar.KONU)) {
+            // Konu forma dahil edilmedi
+        } else if (form.konuTr == null || form.konuTr.isBlank()) {
             u.add(Uyari.kirmizi("Konu", "Konu boş."));
         } else if (n > sinir) {
             String m = "Konu " + n + " / " + sinir + " karakter — sınır aşıldı.";
             u.add(ayarlar.konuSinirSert() ? Uyari.kirmizi("Konu", m) : Uyari.sari("Konu", m));
         }
-        if (form.ikiDilli() && (form.konuEn == null || form.konuEn.isBlank())) {
+        if (form.dahil(Satirlar.KONU) && form.ikiDilli() && (form.konuEn == null || form.konuEn.isBlank())) {
             u.add(Uyari.kirmizi("Konu (EN)", "İki dilli formda İngilizce konu boş."));
         }
 
@@ -92,7 +97,7 @@ public final class Dogrulayici {
         }
 
         // Vekaletname sona erme tarihi
-        if (form.vekaletname()) {
+        if (form.vekaletname() && form.dahil(Satirlar.SONA_ERME)) {
             if (form.sonaErmeTarihi == null || form.sonaErmeTarihi.isBlank()) {
                 u.add(Uyari.sari("Sona Erme Tarihi", "Sona erme tarihi boş."));
             } else {
@@ -104,7 +109,7 @@ public final class Dogrulayici {
                 }
             }
         }
-        if (ozelForm && form.kisiler.isEmpty()) {
+        if (ozelForm && form.dahil(Satirlar.KISILER) && form.kisiler.isEmpty()) {
             u.add(Uyari.kirmizi("Kişiler", "Kişi listesi boş."));
         }
 

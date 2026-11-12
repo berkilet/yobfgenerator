@@ -3,6 +3,8 @@ package legal.erk.yobf.render;
 import legal.erk.yobf.config.Ayarlar;
 import legal.erk.yobf.config.Imzaci;
 import legal.erk.yobf.model.Bedel;
+import legal.erk.yobf.model.EkSatir;
+import legal.erk.yobf.model.Satirlar;
 import legal.erk.yobf.model.FormVerisi;
 import legal.erk.yobf.model.SozlesmeGrubu;
 import org.apache.poi.util.Units;
@@ -221,37 +223,54 @@ public final class FormYazici {
 
     // ------------------------------------------------------------------ ana tablo
 
+    /** Ana tablo yazımı sırasında durum: ilk satır kullanıldı mı, hangi konumlar yazıldı. */
+    private static final class Tablo {
+        final XWPFTable t;
+        final FormVerisi f;
+        boolean ilkKullanildi;
+        final java.util.Set<String> yazilanKonumlar = new java.util.HashSet<>();
+        Tablo(XWPFTable t, FormVerisi f) { this.t = t; this.f = f; }
+    }
+
     private void anaTablo(XWPFDocument doc, FormVerisi f) {
         XWPFTable t = doc.createTable(1, 3);
         sabitTablo(t, new int[]{ETIKET_SUTUN, AYRAC_SUTUN, DEGER_SUTUN});
         kenarliklar(t, true);
         t.setCellMargins(70, 80, 70, 80);
         boolean en = f.ikiDilli();
+        Tablo tb = new Tablo(t, f);
 
-        satir(t, true, en ? "Tarih / Date" : "Tarih", c -> tekSatir(c, f.tarih));
-        satir(t, false, en ? "Belge Türü / Document Type" : "Belge Türü", c -> tekSatir(c, belgeTuru(f)));
-        satir(t, false, en ? "Belgeyi Talep Eden Departman / Requesting Department" : "Belgeyi Talep Eden Departman",
+        satir(tb, Satirlar.TARIH, en ? "Tarih / Date" : "Tarih", c -> tekSatir(c, f.tarih));
+        satir(tb, Satirlar.BELGE_TURU, en ? "Belge Türü / Document Type" : "Belge Türü", c -> tekSatir(c, belgeTuru(f)));
+        satir(tb, Satirlar.TALEP_EDEN, en ? "Belgeyi Talep Eden Departman / Requesting Department" : "Belgeyi Talep Eden Departman",
                 c -> cokSatir(c, f.talepEdenDepartman));
-        satir(t, false, en ? "Belgeyi İmzaya Sunan Departman / Department Submitting for Signature"
+        satir(tb, Satirlar.IMZAYA_SUNAN, en ? "Belgeyi İmzaya Sunan Departman / Department Submitting for Signature"
                 : "Belgeyi İmzaya Sunan Departman", c -> cokSatir(c, f.imzayaSunanDepartman));
 
         if (f.azilname()) {
-            satir(t, false, "Azledilecek Kişiler", c -> tekSatir(c, String.join(", ", f.kisiler)));
-            satir(t, false, "Azleden Şirketler", c -> liste(c, f.sirketler));
-            satir(t, false, "Konu", c -> konuVeNot(c, f));
+            satir(tb, Satirlar.KISILER, "Azledilecek Kişiler", c -> tekSatir(c, String.join(", ", f.kisiler)));
+            satir(tb, Satirlar.SIRKETLER, "Azleden Şirketler", c -> liste(c, f.sirketler));
+            satir(tb, Satirlar.KONU, "Konu", c -> konuVeNot(c, f));
         } else if (f.vekaletname()) {
-            satir(t, false, "Vekaletname Verilecek Kişiler", c -> tekSatir(c, String.join(", ", f.kisiler)));
-            satir(t, false, "Vekaletname Veren Şirket", c -> liste(c, f.sirketler));
-            satir(t, false, "Sona Erme Tarihi", c -> tekSatir(c, f.sonaErmeTarihi));
-            satir(t, false, "Konu", c -> konuVeNot(c, f));
+            satir(tb, Satirlar.KISILER, "Vekaletname Verilecek Kişiler", c -> tekSatir(c, String.join(", ", f.kisiler)));
+            satir(tb, Satirlar.SIRKETLER, "Vekaletname Veren Şirket", c -> liste(c, f.sirketler));
+            satir(tb, Satirlar.SONA_ERME, "Sona Erme Tarihi", c -> tekSatir(c, f.sonaErmeTarihi));
+            satir(tb, Satirlar.KONU, "Konu", c -> konuVeNot(c, f));
         } else {
-            satir(t, false, en ? "Belgenin Konusu/Özeti / Subject/Summary of the Document" : "Belgenin Konusu/Özeti",
-                    c -> konuBlogu(c, f));
+            boolean icerikVar = f.dahil(Satirlar.TARAFLAR) || f.dahil(Satirlar.KONU) || f.dahil(Satirlar.BEDEL)
+                    || f.ekSatirlar.stream().anyMatch(e -> e.alt() && Satirlar.KONU.equals(e.konum()) && !e.bos());
+            if (icerikVar) {
+                satir(tb, Satirlar.KONU, en ? "Belgenin Konusu/Özeti / Subject/Summary of the Document" : "Belgenin Konusu/Özeti",
+                        c -> konuBlogu(c, f));
+            } else {
+                ekSatirlariYaz(tb, Satirlar.KONU);
+            }
         }
 
-        List<String> yetkili = f.imzasinaSunulacak.stream().filter(s -> s != null && !s.isBlank()).toList();
+        List<String> yetkili = f.imzasinaSunulacak.stream().filter(x -> x != null && !x.isBlank()).toList();
         if (!yetkili.isEmpty()) {
-            satir(t, false, en ? "İmzasına Sunulacak Yetkili / Authorized Signatory" : "İmzasına Sunulacak Yetkili",
+            satir(tb, Satirlar.IMZASINA_SUNULACAK,
+                    en ? "İmzasına Sunulacak Yetkili / Authorized Signatory" : "İmzasına Sunulacak Yetkili",
                     c -> {
                         XWPFParagraph p = ilkParagraf(c);
                         for (int i = 0; i < yetkili.size(); i++) {
@@ -259,6 +278,45 @@ public final class FormYazici {
                             aciklamali(p, yetkili.get(i));
                         }
                     });
+        } else {
+            ekSatirlariYaz(tb, Satirlar.IMZASINA_SUNULACAK);
+        }
+
+        // Konumu bu formda bulunmayan ek satırlar tablonun sonuna
+        for (EkSatir e : f.ekSatirlar) {
+            if (!e.bos() && !tb.yazilanKonumlar.contains(e.konum())) {
+                tekEkSatir(tb, e);
+            }
+        }
+    }
+
+    /** Konumdan sonra gelen (alt olmayan) ek satırları yazar. */
+    private void ekSatirlariYaz(Tablo tb, String konum) {
+        tb.yazilanKonumlar.add(konum);
+        for (EkSatir e : tb.f.ekSatirlar) {
+            if (!e.alt() && konum.equals(e.konum()) && !e.bos()) tekEkSatir(tb, e);
+        }
+    }
+
+    private void tekEkSatir(Tablo tb, EkSatir e) {
+        satirYaz(tb, e.etiket(), c -> cokSatir(c, e.deger()));
+    }
+
+    /** Hücrenin sonuna konuma ait alt satırları ekler. */
+    private static void altSatirlariYaz(XWPFTableCell c, FormVerisi f, String konum) {
+        for (EkSatir e : f.ekSatirlar) {
+            if (!e.alt() || !konum.equals(e.konum()) || e.bos()) continue;
+            ayirici(c);
+            String[] satirlar = e.deger().isEmpty() ? new String[]{""} : e.deger().split("\\R");
+            for (int i = 0; i < satirlar.length; i++) {
+                XWPFParagraph p = yeniParagraf(c);
+                p.setAlignment(ParagraphAlignment.BOTH);
+                if (i == 0 && !e.etiket().isEmpty()) {
+                    run(p, e.etiket().endsWith(":") ? e.etiket() : e.etiket() + ":", true, false, true, GOVDE);
+                    if (!satirlar[0].isEmpty()) run(p, " ", false, false, false, GOVDE);
+                }
+                if (!satirlar[i].isEmpty()) run(p, satirlar[i], false, false, false, GOVDE);
+            }
         }
     }
 
@@ -281,8 +339,20 @@ public final class FormYazici {
         }
     }
 
-    private void satir(XWPFTable t, boolean ilk, String etiket, Consumer<XWPFTableCell> deger) {
-        XWPFTableRow r = ilk ? t.getRow(0) : t.createRow();
+    /** Satır dahilse yazar (alt satırlarıyla), ardından konumuna eklenen ek satırları yazar. */
+    private void satir(Tablo tb, String anahtar, String etiket, Consumer<XWPFTableCell> deger) {
+        if (tb.f.dahil(anahtar)) {
+            satirYaz(tb, etiket, c -> {
+                deger.accept(c);
+                altSatirlariYaz(c, tb.f, anahtar);
+            });
+        }
+        ekSatirlariYaz(tb, anahtar);
+    }
+
+    private void satirYaz(Tablo tb, String etiket, Consumer<XWPFTableCell> deger) {
+        XWPFTableRow r = tb.ilkKullanildi ? tb.t.createRow() : tb.t.getRow(0);
+        tb.ilkKullanildi = true;
         r.setCantSplitRow(true);
         XWPFTableCell e = r.getCell(0);
         e.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
@@ -318,48 +388,64 @@ public final class FormYazici {
     }
 
     /** YOBF / YOBF_TR_EN: Taraflar + Konu + (Bedel) + (Not). */
+    /** Hücre henüz boşsa ilk paragrafı, değilse yeni paragrafı döndürür. */
+    private static XWPFParagraph yeniParagraf(XWPFTableCell c) {
+        return hucreBos(c) ? ilkParagraf(c) : c.addParagraph();
+    }
+
+    private static boolean hucreBos(XWPFTableCell c) {
+        return c.getParagraphs().isEmpty()
+                || (c.getParagraphs().size() == 1 && c.getParagraphs().get(0).getRuns().isEmpty());
+    }
+
+    /** Bölümler arasına boş satır (hücre boşsa eklenmez). */
+    private static void ayirici(XWPFTableCell c) {
+        if (!hucreBos(c)) bosParagraf(c);
+    }
+
+    /** YOBF / YOBF_TR_EN: Taraflar + Konu + (Bedel) + (Not); her bölüm ayrı ayrı dahil edilebilir. */
     private void konuBlogu(XWPFTableCell c, FormVerisi f) {
         boolean en = f.ikiDilli();
         boolean coklu = f.sozlesmeler.size() > 1;
-        XWPFParagraph p = ilkParagraf(c);
-        boolean bas = true;
 
-        for (int g = 0; g < f.sozlesmeler.size(); g++) {
-            SozlesmeGrubu sg = f.sozlesmeler.get(g);
-            List<String> taraflar = sg.taraflar.stream().filter(x -> x != null && !x.isBlank()).toList();
-            if (taraflar.isEmpty()) continue;
-            if (!bas) p = c.addParagraph();
-            bas = false;
-            String etiket = (coklu ? (g + 1) + ". Sözleşme " : "") + (en ? "Taraflar / Parties:" : "Taraflar:");
-            run(p, etiket, true, false, true, GOVDE);
-            for (int i = 0; i < taraflar.size(); i++) {
-                XWPFParagraph tp = c.addParagraph();
-                tp.setIndentationLeft(coklu ? 500 : 360);
-                tp.setIndentationHanging(0);
-                run(tp, (i + 1) + ") " + taraflar.get(i).trim(), false, false, false, GOVDE);
+        if (f.dahil(Satirlar.TARAFLAR)) {
+            for (int g = 0; g < f.sozlesmeler.size(); g++) {
+                SozlesmeGrubu sg = f.sozlesmeler.get(g);
+                List<String> taraflar = sg.taraflar.stream().filter(x -> x != null && !x.isBlank()).toList();
+                if (taraflar.isEmpty()) continue;
+                XWPFParagraph p = yeniParagraf(c);
+                String etiket = (coklu ? (g + 1) + ". Sözleşme " : "") + (en ? "Taraflar / Parties:" : "Taraflar:");
+                run(p, etiket, true, false, true, GOVDE);
+                for (int i = 0; i < taraflar.size(); i++) {
+                    XWPFParagraph tp = c.addParagraph();
+                    tp.setIndentationLeft(coklu ? 500 : 360);
+                    tp.setIndentationHanging(0);
+                    run(tp, (i + 1) + ") " + taraflar.get(i).trim(), false, false, false, GOVDE);
+                }
             }
         }
 
-        if (!bas) bosParagraf(c);
-        XWPFParagraph kp = bas ? p : c.addParagraph();
-        kp.setAlignment(ParagraphAlignment.BOTH);
-        run(kp, en ? "Konu / Subject:" : "Konu:", true, false, true, GOVDE);
-        run(kp, " " + nz(f.konuTr).trim(), false, false, false, GOVDE);
-        if (en && !nz(f.konuEn).isBlank()) {
-            bosParagraf(c);
-            XWPFParagraph ep = c.addParagraph();
-            ep.setAlignment(ParagraphAlignment.BOTH);
-            run(ep, f.konuEn.trim(), false, false, false, GOVDE);
+        if (f.dahil(Satirlar.KONU)) {
+            ayirici(c);
+            XWPFParagraph kp = yeniParagraf(c);
+            kp.setAlignment(ParagraphAlignment.BOTH);
+            run(kp, en ? "Konu / Subject:" : "Konu:", true, false, true, GOVDE);
+            run(kp, " " + nz(f.konuTr).trim(), false, false, false, GOVDE);
+            if (en && !nz(f.konuEn).isBlank()) {
+                bosParagraf(c);
+                XWPFParagraph ep = c.addParagraph();
+                ep.setAlignment(ParagraphAlignment.BOTH);
+                run(ep, f.konuEn.trim(), false, false, false, GOVDE);
+            }
         }
 
-        // Bedel
         boolean bedelVar = f.sozlesmeler.stream().anyMatch(sg -> sg.bedeller.stream().anyMatch(b -> !b.bos()));
-        if (bedelVar) {
-            bosParagraf(c);
+        if (f.dahil(Satirlar.BEDEL) && bedelVar) {
+            ayirici(c);
             for (int g = 0; g < f.sozlesmeler.size(); g++) {
                 List<Bedel> bl = f.sozlesmeler.get(g).bedeller.stream().filter(b -> !b.bos()).toList();
                 for (int i = 0; i < bl.size(); i++) {
-                    XWPFParagraph bp = c.addParagraph();
+                    XWPFParagraph bp = yeniParagraf(c);
                     String etiket = coklu ? (g + 1) + ". Sözleşme Bedeli" : nz(f.bedelEtiketi, "Bedel");
                     if (en) etiket += " / " + BEDEL_ETIKETI_EN.getOrDefault(coklu ? "Sözleşme Bedeli" : etiket, "Price");
                     if (i == 0) {
@@ -384,11 +470,11 @@ public final class FormYazici {
     }
 
     private static void not(XWPFTableCell c, FormVerisi f) {
-        if (nz(f.notMetni).isBlank()) return;
-        bosParagraf(c);
+        if (!f.dahil(Satirlar.NOT) || nz(f.notMetni).isBlank()) return;
+        ayirici(c);
         String[] satirlar = f.notMetni.trim().split("\\R");
         for (int i = 0; i < satirlar.length; i++) {
-            XWPFParagraph np = c.addParagraph();
+            XWPFParagraph np = yeniParagraf(c);
             np.setAlignment(ParagraphAlignment.BOTH);
             if (i == 0) run(np, nz(f.notEtiketi, "Not:") + " ", true, true, false, ACIKLAMA);
             run(np, satirlar[i], false, true, false, ACIKLAMA);

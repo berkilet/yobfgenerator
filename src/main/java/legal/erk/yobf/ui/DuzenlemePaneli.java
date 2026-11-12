@@ -5,6 +5,7 @@ import legal.erk.yobf.config.Imzaci;
 import legal.erk.yobf.config.Yapilandirma;
 import legal.erk.yobf.model.Bedel;
 import legal.erk.yobf.model.FormVerisi;
+import legal.erk.yobf.model.Satirlar;
 import legal.erk.yobf.model.SozlesmeGrubu;
 import legal.erk.yobf.rules.FormHazirlayici;
 import legal.erk.yobf.rules.KarakterSayaci;
@@ -12,6 +13,7 @@ import legal.erk.yobf.rules.Uyari;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JFileChooser;
@@ -80,6 +82,8 @@ public class DuzenlemePaneli extends JPanel {
     private final Map<String, javax.swing.ImageIcon> kucukResimler = new HashMap<>();
 
     private final ImzaciPaneli imzaciPaneli;
+    private final EkSatirlarPaneli ekSatirlar = new EkSatirlarPaneli();
+    private final Map<String, JCheckBox> dahilKutulari = new java.util.LinkedHashMap<>();
 
     private final List<JComponent> yobfAlanlari = new ArrayList<>();
     private final List<JComponent> ozelAlanlar = new ArrayList<>();
@@ -110,41 +114,41 @@ public class DuzenlemePaneli extends JPanel {
 
         int r = 0;
         r = satir(r, "Form türü", formTuru, null);
-        r = satir(r, "Tarih (GG.AA.YYYY)", tarih, "Tarih");
-        r = satir(r, "Belge Türü", belgeTuru, "Belge Türü");
-        r = satir(r, "Talep Eden Departman", talepEden, null);
-        r = satir(r, "İmzaya Sunan Departman", imzayaSunan, null);
+        r = satir(r, "Tarih (GG.AA.YYYY)", tarih, Satirlar.TARIH);
+        r = satir(r, "Belge Türü", belgeTuru, Satirlar.BELGE_TURU);
+        r = satir(r, "Talep Eden Departman", talepEden, Satirlar.TALEP_EDEN);
+        r = satir(r, "İmzaya Sunan Departman", imzayaSunan, Satirlar.IMZAYA_SUNAN);
 
         r = satir(r, "<html>Taraflar<br><small>her satıra bir taraf;<br>çoklu sözleşmede<br>gruplar arası \"---\"</small></html>",
-                kaydir(taraflar), "Taraflar", yobfAlanlari);
+                kaydir(taraflar), Satirlar.TARAFLAR, yobfAlanlari);
         JPanel bedelPanel = new JPanel(new BorderLayout(4, 4));
         bedelPanel.add(bedelEtiketi, BorderLayout.NORTH);
         bedelPanel.add(kaydir(bedeller), BorderLayout.CENTER);
         r = satir(r, "<html>Bedel<br><small>ör. 3.570.000 TL + KDV;<br>gruplar arası \"---\"</small></html>",
-                bedelPanel, "Bedel", yobfAlanlari);
+                bedelPanel, Satirlar.BEDEL, yobfAlanlari);
 
-        r = satir(r, "<html>Kişiler<br><small>virgülle ayırın</small></html>", kaydir(kisiler), "Kişiler", ozelAlanlar);
-        r = satir(r, "<html>Şirketler<br><small>her satıra bir şirket</small></html>", kaydir(sirketler), "Şirketler", ozelAlanlar);
-        r = satir(r, "Sona Erme Tarihi", sonaErme, "Sona Erme Tarihi", vekaletAlanlari);
+        r = satir(r, "<html>Kişiler<br><small>virgülle ayırın</small></html>", kaydir(kisiler), Satirlar.KISILER, ozelAlanlar);
+        r = satir(r, "<html>Şirketler<br><small>her satıra bir şirket</small></html>", kaydir(sirketler), Satirlar.SIRKETLER, ozelAlanlar);
+        r = satir(r, "Sona Erme Tarihi", sonaErme, Satirlar.SONA_ERME, vekaletAlanlari);
 
         JPanel konuPanel = new JPanel(new BorderLayout(4, 2));
         konuPanel.add(kaydir(konuTr), BorderLayout.CENTER);
         JPanel sayacPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         sayacPanel.add(konuSayac);
         konuPanel.add(sayacPanel, BorderLayout.SOUTH);
-        r = satir(r, "Konu", konuPanel, "Konu");
-        r = satir(r, "Konu (EN)", kaydir(konuEn), "Konu (EN)", enAlanlari);
+        r = satir(r, "Konu", konuPanel, Satirlar.KONU);
+        r = satir(r, "Konu (EN)", kaydir(konuEn), null, enAlanlari);
 
         JPanel notPanel = new JPanel(new BorderLayout(4, 4));
         notPanel.add(notEtiketi, BorderLayout.NORTH);
         notPanel.add(kaydir(notMetni), BorderLayout.CENTER);
-        r = satir(r, "<html>Not<br><small>hukukçu yazar;<br>model doldurmaz</small></html>", notPanel, null);
+        r = satir(r, "<html>Not<br><small>hukukçu yazar;<br>model doldurmaz</small></html>", notPanel, Satirlar.NOT);
 
         JPanel yetkiliPanel = new JPanel(new BorderLayout(4, 4));
         yetkiliPanel.add(yetkiliSecici, BorderLayout.NORTH);
         yetkiliPanel.add(kaydir(imzasinaSunulacak), BorderLayout.CENTER);
         r = satir(r, "<html>İmzasına Sunulacak<br>Yetkili <small>(opsiyonel)</small><br>"
-                + "<small>ör. Sn. Ad SOYAD (X için)</small></html>", yetkiliPanel, null);
+                + "<small>ör. Sn. Ad SOYAD (X için)</small></html>", yetkiliPanel, Satirlar.IMZASINA_SUNULACAK);
 
         JPanel logoPanel = new JPanel(new BorderLayout(4, 4));
         logoPanel.add(logo, BorderLayout.NORTH);
@@ -152,7 +156,16 @@ public class DuzenlemePaneli extends JPanel {
         logoOnizleme.setHorizontalTextPosition(JLabel.RIGHT);
         logoOnizleme.setIconTextGap(12);
         logoPanel.add(logoOnizleme, BorderLayout.CENTER);
-        r = satir(r, "<html>Logo<br><small>elle seçilebilir</small></html>", logoPanel, "Logo");
+        r = satir(r, "<html>Logo<br><small>elle seçilebilir</small></html>", logoPanel, null);
+
+        GridBagConstraints ek = new GridBagConstraints();
+        ek.gridx = 0;
+        ek.gridy = r++;
+        ek.gridwidth = 2;
+        ek.fill = GridBagConstraints.HORIZONTAL;
+        ek.weightx = 1;
+        ek.insets = new Insets(8, 4, 4, 4);
+        add(ekSatirlar, ek);
 
         GridBagConstraints c = new GridBagConstraints();
         c.gridx = 0;
@@ -207,16 +220,41 @@ public class DuzenlemePaneli extends JPanel {
         return c;
     }
 
-    private int satir(int r, String etiket, JComponent bilesen, String alan) {
-        return satir(r, etiket, bilesen, alan, null);
+    private int satir(int r, String etiket, JComponent bilesen, String anahtar) {
+        return satir(r, etiket, bilesen, anahtar, null);
     }
 
-    private int satir(int r, String etiket, JComponent bilesen, String alan, List<JComponent> grup) {
+    /** Satır dışarıda bırakıldığında içindeki alanlar soluklaşır (değerler korunur). */
+    private static void etkinlestir(java.awt.Component c, boolean acik) {
+        c.setEnabled(acik);
+        if (c instanceof java.awt.Container k) for (java.awt.Component x : k.getComponents()) etkinlestir(x, acik);
+    }
+
+    private static void etiketYaz(JComponent c, String metin) {
+        if (c instanceof JLabel l) l.setText(metin);
+        else if (c instanceof javax.swing.AbstractButton b) b.setText(metin);
+    }
+
+    /** anahtar null değilse satır etiketi "forma dahil et" kutucuğudur. */
+    private int satir(int r, String etiket, JComponent bilesen, String anahtar, List<JComponent> grup) {
         GridBagConstraints c = new GridBagConstraints();
         c.gridy = r;
         c.insets = new Insets(4, 4, 4, 8);
         c.anchor = GridBagConstraints.NORTHWEST;
-        JLabel l = new JLabel(etiket);
+        JComponent l;
+        if (anahtar != null) {
+            JCheckBox kutu = new JCheckBox(etiket, true);
+            kutu.setToolTipText("İşaretliyse bu satır forma dahil edilir");
+            kutu.setVerticalTextPosition(javax.swing.SwingConstants.TOP);
+            kutu.addActionListener(e -> {
+                etkinlestir(bilesen, kutu.isSelected());
+                degisti.run();
+            });
+            dahilKutulari.put(anahtar, kutu);
+            l = kutu;
+        } else {
+            l = new JLabel(etiket);
+        }
         add(l, c);
         c.gridx = 1;
         c.weightx = 1;
@@ -398,12 +436,13 @@ public class DuzenlemePaneli extends JPanel {
         ozelAlanlar.forEach(c -> c.setVisible(ozel));
         vekaletAlanlari.forEach(c -> c.setVisible("VEKALETNAME".equals(kod)));
         enAlanlari.forEach(c -> c.setVisible("YOBF_TR_EN".equals(kod)));
-        ((JLabel) ozelAlanlar.get(0)).setText("AZILNAME".equals(kod)
+        etiketYaz(ozelAlanlar.get(0), "AZILNAME".equals(kod)
                 ? "<html>Azledilecek Kişiler<br><small>virgülle ayırın</small></html>"
                 : "<html>Vekaletname Verilecek<br>Kişiler <small>(virgülle)</small></html>");
-        ((JLabel) ozelAlanlar.get(2)).setText("AZILNAME".equals(kod)
+        etiketYaz(ozelAlanlar.get(2), "AZILNAME".equals(kod)
                 ? "<html>Azleden Şirketler<br><small>her satıra bir şirket</small></html>"
                 : "<html>Vekaletname Veren<br>Şirket <small>(satır başına bir)</small></html>");
+        ekSatirlar.formTuruDegisti(kod);
         logoOnizlemeGuncelle();
         revalidate();
         repaint();
@@ -418,6 +457,7 @@ public class DuzenlemePaneli extends JPanel {
     public void degisinceCalistir(Runnable r) {
         this.degisti = r;
         imzaciPaneli.degisinceCalistir(r);
+        ekSatirlar.degisinceCalistir(r);
     }
 
     // ---------------------------------------------------------------- veri aktarımı
@@ -450,10 +490,16 @@ public class DuzenlemePaneli extends JPanel {
             imzasinaSunulacak.setText(String.join("\n", f.imzasinaSunulacak));
             imzaciPaneli.yukle(f.anaImzacilar, f.ekOnayAcik, f.ekOnayBaslik, f.ekOnayImzaci);
             logo.setSelectedIndex(0);
+            for (Map.Entry<String, JCheckBox> e : dahilKutulari.entrySet()) {
+                boolean dahil = f.dahil(e.getKey());
+                e.getValue().setSelected(dahil);
+            }
+            ekSatirlar.yukle(f.ekSatirlar);
             konuTr.setCaretPosition(0);
         } finally {
             yukleniyor = false;
         }
+        satirDurumlariniUygula();
         formTuruDegisti();
     }
 
@@ -487,7 +533,17 @@ public class DuzenlemePaneli extends JPanel {
         f.ekOnayAcik = imzaciPaneli.ekOnayAcik();
         f.ekOnayBaslik = imzaciPaneli.ekOnayBaslik();
         f.ekOnayImzaci = hazirlayici.kanonik(imzaciPaneli.ekOnayImzaci());
+        for (Map.Entry<String, JCheckBox> e : dahilKutulari.entrySet()) {
+            if (!e.getValue().isSelected()) f.gizliSatirlar.add(e.getKey());
+        }
+        f.ekSatirlar.addAll(ekSatirlar.oku());
         return f;
+    }
+
+    private void satirDurumlariniUygula() {
+        for (JCheckBox k : dahilKutulari.values()) {
+            for (java.awt.event.ActionListener a : k.getActionListeners()) a.actionPerformed(null);
+        }
     }
 
     /** Elle seçilen logo; "Otomatik" ise null. */
