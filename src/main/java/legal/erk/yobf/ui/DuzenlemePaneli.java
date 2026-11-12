@@ -76,7 +76,8 @@ public class DuzenlemePaneli extends JPanel {
     private final JComboBox<String> yetkiliSecici;
 
     private final JComboBox<Object> logo = new JComboBox<>();
-    private Path elleLogo;
+    private final JLabel logoOnizleme = new JLabel();
+    private final Map<String, javax.swing.ImageIcon> kucukResimler = new HashMap<>();
 
     private final ImzaciPaneli imzaciPaneli;
 
@@ -145,9 +146,13 @@ public class DuzenlemePaneli extends JPanel {
         r = satir(r, "<html>İmzasına Sunulacak<br>Yetkili <small>(opsiyonel)</small><br>"
                 + "<small>ör. Sn. Ad SOYAD (X için)</small></html>", yetkiliPanel, null);
 
-        JPanel logoPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        logoPanel.add(logo);
-        r = satir(r, "Logo", logoPanel, "Logo");
+        JPanel logoPanel = new JPanel(new BorderLayout(4, 4));
+        logoPanel.add(logo, BorderLayout.NORTH);
+        logoOnizleme.setBorder(BorderFactory.createEmptyBorder(4, 2, 2, 2));
+        logoOnizleme.setHorizontalTextPosition(JLabel.RIGHT);
+        logoOnizleme.setIconTextGap(12);
+        logoPanel.add(logoOnizleme, BorderLayout.CENTER);
+        r = satir(r, "<html>Logo<br><small>elle seçilebilir</small></html>", logoPanel, "Logo");
 
         GridBagConstraints c = new GridBagConstraints();
         c.gridx = 0;
@@ -174,8 +179,10 @@ public class DuzenlemePaneli extends JPanel {
         alanBilesenleri.put("Konu (EN)", List.of(konuEn));
         alanBilesenleri.put("Logo", List.of(logo));
 
+        logoListesiGorunumu();
         logolariYukle();
         dinleyiciler();
+        logoOnizlemeGuncelle();
         formTuruDegisti();
         konuSay();
     }
@@ -231,12 +238,96 @@ public class DuzenlemePaneli extends JPanel {
             try (Stream<Path> s = Files.list(klasor)) {
                 s.filter(p -> p.getFileName().toString().toLowerCase().matches(".*\\.(png|jpe?g)$"))
                         .sorted()
-                        .forEach(p -> logo.addItem(p.getFileName().toString()));
+                        .forEach(logo::addItem);
             } catch (IOException ignored) {
                 // logo listesi boş kalır
             }
         }
         logo.addItem(LOGO_GOZAT);
+    }
+
+    /** Açılır listede ve önizlemede gösterilen küçük logo resmi (yükseklik sabit). */
+    private javax.swing.ImageIcon kucukResim(Path p, int yukseklik) {
+        if (p == null) return null;
+        Path yol = p.toAbsolutePath();
+        return kucukResimler.computeIfAbsent(yol + "|" + yukseklik, anahtar -> {
+            Path k = yol;
+            try {
+                java.awt.image.BufferedImage im = javax.imageio.ImageIO.read(k.toFile());
+                if (im == null) return null;
+                int gen = Math.max(1, im.getWidth() * yukseklik / im.getHeight());
+                if (gen > 220) { gen = 220; }
+                int yuk = Math.max(1, im.getHeight() * gen / im.getWidth());
+                return new javax.swing.ImageIcon(im.getScaledInstance(gen, yuk, java.awt.Image.SCALE_SMOOTH));
+            } catch (IOException | RuntimeException e) {
+                return null;
+            }
+        });
+    }
+
+    private static String logoAdi(Path p) {
+        String n = p.getFileName().toString().replaceFirst("\\.[^.]+$", "").replace('-', ' ').replace('_', ' ');
+        StringBuilder b = new StringBuilder();
+        for (String k : n.split(" +")) {
+            if (k.isEmpty()) continue;
+            k = switch (k.toLowerCase(java.util.Locale.ROOT)) {
+                case "isletme" -> "İşletme";
+                case "insaat" -> "İnşaat";
+                case "gunes" -> "Güneş";
+                case "yeka", "res", "ges", "eib", "ev" -> k.toUpperCase(java.util.Locale.ROOT);
+                default -> Character.toUpperCase(k.charAt(0)) + k.substring(1);
+            };
+            b.append(b.isEmpty() ? "" : " ").append(k);
+        }
+        return b + "  (" + p.getFileName() + ")";
+    }
+
+    private void logoListesiGorunumu() {
+        logo.setMaximumRowCount(10);
+        logo.setRenderer(new javax.swing.DefaultListCellRenderer() {
+            @Override
+            public java.awt.Component getListCellRendererComponent(javax.swing.JList<?> l, Object v, int i,
+                                                                    boolean sec, boolean odak) {
+                JLabel r = (JLabel) super.getListCellRendererComponent(l, v, i, sec, odak);
+                r.setIcon(null);
+                if (v instanceof Path p) {
+                    r.setText(logoAdi(p));
+                    r.setIcon(kucukResim(p, 26));
+                    r.setIconTextGap(10);
+                    r.setBorder(BorderFactory.createEmptyBorder(3, 4, 3, 4));
+                }
+                return r;
+            }
+        });
+    }
+
+    /** "Otomatik" seçiliyse taraflara göre seçilecek logoyu, değilse seçilen logoyu gösterir. */
+    private void logoOnizlemeGuncelle() {
+        Path elle = secilenLogo();
+        Path goster;
+        String metin;
+        if (elle != null) {
+            goster = elle;
+            metin = "<html>Elle seçildi: <b>" + logoAdi(elle) + "</b></html>";
+        } else {
+            legal.erk.yobf.rules.LogoCozumleyici lc = new legal.erk.yobf.rules.LogoCozumleyici(
+                    y.sirketler(), legal.erk.yobf.config.UygulamaYolu.logolar());
+            FormVerisi f = new FormVerisi();
+            f.formTuru = secilenFormTuru();
+            f.sirketler.addAll(satirlar(sirketler.getText()));
+            gruplar(taraflar.getText()).forEach(g -> f.sozlesmeler.add(new SozlesmeGrubu(g, List.of())));
+            legal.erk.yobf.rules.LogoCozumleyici.Sonuc s = lc.coz(f.logoIcinSirketler(), null);
+            goster = s.logo();
+            if (goster == null) metin = "<html><span style='color:#C62828'>Logo dosyası bulunamadı</span></html>";
+            else if (s.kullaniciyaSor()) metin = "<html>Otomatik: <b>" + logoAdi(goster)
+                    + "</b><br><small>Farklı logolu birden fazla grup şirketi var; Word oluştururken sorulacak.</small></html>";
+            else if (s.grupSirketleri().isEmpty()) metin = "<html>Otomatik: <b>" + logoAdi(goster)
+                    + "</b><br><small>Grup şirketi tespit edilmedi — varsayılan logo.</small></html>";
+            else metin = "<html>Otomatik: <b>" + logoAdi(goster) + "</b><br><small>"
+                    + s.grupSirketleri().get(0).unvan() + "</small></html>";
+        }
+        logoOnizleme.setIcon(kucukResim(goster, 44));
+        logoOnizleme.setText(metin);
     }
 
     private void dinleyiciler() {
@@ -259,14 +350,22 @@ public class DuzenlemePaneli extends JPanel {
                 JFileChooser fc = new JFileChooser(legal.erk.yobf.config.UygulamaYolu.logolar().toFile());
                 fc.setFileFilter(new FileNameExtensionFilter("Logo (PNG, JPG)", "png", "jpg", "jpeg"));
                 if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-                    elleLogo = fc.getSelectedFile().toPath();
-                    logo.insertItemAt(elleLogo, logo.getItemCount() - 1);
-                    logo.setSelectedItem(elleLogo);
+                    Path secilen = fc.getSelectedFile().toPath();
+                    logo.insertItemAt(secilen, logo.getItemCount() - 1);
+                    logo.setSelectedItem(secilen);
                 } else {
                     logo.setSelectedIndex(0);
                 }
             }
+            logoOnizlemeGuncelle();
         });
+        DocumentListener logoDinleyici = new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { logoOnizlemeGuncelle(); }
+            public void removeUpdate(DocumentEvent e) { logoOnizlemeGuncelle(); }
+            public void changedUpdate(DocumentEvent e) { logoOnizlemeGuncelle(); }
+        };
+        taraflar.getDocument().addDocumentListener(logoDinleyici);
+        sirketler.getDocument().addDocumentListener(logoDinleyici);
         DocumentListener d = new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { konuSay(); }
             public void removeUpdate(DocumentEvent e) { konuSay(); }
@@ -305,6 +404,7 @@ public class DuzenlemePaneli extends JPanel {
         ((JLabel) ozelAlanlar.get(2)).setText("AZILNAME".equals(kod)
                 ? "<html>Azleden Şirketler<br><small>her satıra bir şirket</small></html>"
                 : "<html>Vekaletname Veren<br>Şirket <small>(satır başına bir)</small></html>");
+        logoOnizlemeGuncelle();
         revalidate();
         repaint();
         degisti.run();
