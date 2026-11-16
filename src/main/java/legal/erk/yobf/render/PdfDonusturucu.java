@@ -19,14 +19,34 @@ public final class PdfDonusturucu {
 
     static final long ZAMAN_ASIMI_SN = 120;
 
-    /** Word ile dönüştürme betiği. 17 = wdFormatPDF. */
-    static final String WORD_BETIGI = String.join("; ",
+    /**
+     * Word ile dönüştürme betiği (çok satırlı; PowerShell'e -EncodedCommand ile verilir, tırnak sorunu olmaz).
+     * ExportAsFixedFormat(…, 17) = wdExportFormatPDF. Hata mesajı stderr'e düz metin yazılır.
+     */
+    static final String WORD_BETIGI = String.join("\r\n",
             "$ErrorActionPreference = 'Stop'",
-            "$w = New-Object -ComObject Word.Application",
-            "$w.Visible = $false",
-            "$w.DisplayAlerts = 0",
-            "try { $d = $w.Documents.Open($env:YOBF_DOCX, $false, $true); $d.SaveAs([ref]$env:YOBF_PDF, [ref]17); $d.Close([ref]0) }",
-            "finally { $w.Quit() }");
+            "$ProgressPreference = 'SilentlyContinue'",
+            "$w = $null",
+            "$hata = $null",
+            "try {",
+            "    $w = New-Object -ComObject Word.Application",
+            "    $w.Visible = $false",
+            "    $w.DisplayAlerts = 0",
+            "    $d = $w.Documents.Open($env:YOBF_DOCX, $false, $true)",
+            "    $d.ExportAsFixedFormat($env:YOBF_PDF, 17)",
+            "    $d.Close(0)",
+            "} catch {",
+            "    $hata = $_.Exception.Message",
+            "} finally {",
+            "    if ($w -ne $null) { try { $w.Quit(0) } catch { } }",
+            "}",
+            "if ($hata) { [Console]::Error.WriteLine($hata); exit 1 }",
+            "exit 0");
+
+    /** PowerShell -EncodedCommand biçimi: UTF-16LE + Base64. */
+    static String kodla(String betik) {
+        return java.util.Base64.getEncoder().encodeToString(betik.getBytes(java.nio.charset.StandardCharsets.UTF_16LE));
+    }
 
     public enum Yontem { WORD, LIBREOFFICE }
 
@@ -69,7 +89,7 @@ public final class PdfDonusturucu {
 
     static void wordIle(Path docx, Path pdf) throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder("powershell", "-NoProfile", "-NonInteractive",
-                "-ExecutionPolicy", "Bypass", "-Command", WORD_BETIGI);
+                "-ExecutionPolicy", "Bypass", "-EncodedCommand", kodla(WORD_BETIGI));
         pb.environment().put("YOBF_DOCX", docx.toAbsolutePath().toString());
         pb.environment().put("YOBF_PDF", pdf.toAbsolutePath().toString());
         calistir(pb, "Word");
@@ -93,13 +113,24 @@ public final class PdfDonusturucu {
                 throw new IOException(ad + " " + ZAMAN_ASIMI_SN + " saniyede yanıt vermedi.");
             }
             if (p.exitValue() != 0) {
-                String cikti = Files.readString(log).strip();
+                String cikti = temizle(new String(Files.readAllBytes(log), java.nio.charset.Charset.defaultCharset()));
                 throw new IOException(ad + " ile PDF oluşturulamadı"
                         + (cikti.isEmpty() ? "." : ": " + cikti.substring(0, Math.min(400, cikti.length()))));
             }
         } finally {
             Files.deleteIfExists(log);
         }
+    }
+
+    /** PowerShell'in "#< CLIXML" / <Objs …> gürültüsünü ayıklar. */
+    static String temizle(String cikti) {
+        StringBuilder b = new StringBuilder();
+        for (String satir : cikti.split("\\R")) {
+            String t = satir.strip();
+            if (t.isEmpty() || t.startsWith("#< CLIXML") || t.startsWith("<Objs")) continue;
+            b.append(b.isEmpty() ? "" : " ").append(t);
+        }
+        return b.toString();
     }
 
     /** soffice'i PATH'te ve yaygın kurulum klasörlerinde arar. */
