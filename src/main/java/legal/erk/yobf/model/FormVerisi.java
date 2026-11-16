@@ -20,6 +20,13 @@ public class FormVerisi {
     // YOBF / YOBF_TR_EN
     public final List<SozlesmeGrubu> sozlesmeler = new ArrayList<>();
     public String bedelEtiketi = "Bedel";
+    /**
+     * Birden fazla belge: false → ayrı belgeler, numaralı gruplar ("1. Sözleşme Taraflar:" …);
+     * true → aynı işleme ait belgeler (ör. dilekçe + taahhütname + YK kararı), taraflar tek listede.
+     */
+    public boolean ayniIslem = false;
+    /** Grup başlığı biçimi; {no} = sıra, {tur} = grubun belge türü. */
+    public String grupBasligi = "{no}. {tur} Taraflar:";
     public String konuTr = "";
     public String konuEn = "";
 

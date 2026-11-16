@@ -220,6 +220,39 @@ class FormYaziciTest {
     }
 
     @Test
+    void cokluBelgeBasliklariTureGore() throws Exception {
+        FormVerisi f = yobf();
+        f.belgeTuru = "Sözleşme ve Protokol";
+        f.sozlesmeler.clear();
+        SozlesmeGrubu a = new SozlesmeGrubu(List.of("Kalyon YEKA GES 5 Elektrik Üretim A.Ş.", "Bir Ltd. Şti."),
+                List.of(new Bedel("1.000.000", "TL", "+ KDV")));
+        a.belgeTuru = "Sözleşme";
+        SozlesmeGrubu b = new SozlesmeGrubu(List.of("Kalyon YEKA GES 5 Elektrik Üretim A.Ş.", "İki A.Ş."),
+                List.of(new Bedel("50.000", "EUR", "")));
+        b.belgeTuru = "Protokol";
+        f.sozlesmeler.addAll(List.of(a, b));
+        f.grupBasligi = "{no}. Evrak ({tur}) Taraflar:";
+        f.anaImzacilar.addAll(imzacilar(2));
+        String m = yazVeOku(f, "coklu_evrak.docx");
+        assertTrue(m.contains("1. Evrak (Sözleşme) Taraflar:"), m);
+        assertTrue(m.contains("2. Evrak (Protokol) Taraflar:"));
+        assertTrue(m.contains("2. Evrak (Protokol) Bedeli: 50.000 EUR"));
+        assertFalse(m.contains("Sözleşme Bedeli"));
+    }
+
+    @Test
+    void ayniIslemTekListeNumarasiz() throws Exception {
+        FormVerisi f = yobf();
+        f.ayniIslem = true;
+        f.belgeTuru = "Dilekçe, Taahhütname ve Yönetim Kurulu Kararı";
+        f.anaImzacilar.addAll(imzacilar(2));
+        String m = yazVeOku(f, "ayni_islem.docx");
+        assertTrue(m.contains("Taraflar:"));
+        assertFalse(m.contains("1. "), "numaralı grup başlığı olmamalı");
+        assertTrue(m.contains("Dilekçe, Taahhütname ve Yönetim Kurulu Kararı"));
+    }
+
+    @Test
     void dosyaAdi() {
         FormVerisi f = yobf();
         String ad = FormYazici.dosyaAdi(f, s -> s.startsWith("Kalyon"), LocalDate.of(2026, 10, 20));

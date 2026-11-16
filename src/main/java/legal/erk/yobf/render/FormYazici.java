@@ -333,6 +333,34 @@ public final class FormYazici {
         }
     }
 
+    /** Birden fazla ayrı belge mi (numaralı gruplar)? */
+    public static boolean numaraliGruplar(FormVerisi f) {
+        return f.sozlesmeler.size() > 1 && !f.ayniIslem;
+    }
+
+    /** Grubun belge türü: grubun kendi türü → formun tek türü → "Belge". */
+    public static String grupTuru(FormVerisi f, int i) {
+        String t = i < f.sozlesmeler.size() ? nz(f.sozlesmeler.get(i).belgeTuru).trim() : "";
+        if (!t.isEmpty()) return t;
+        String b = nz(f.belgeTuru).trim();
+        if (!b.isEmpty() && !b.contains(",") && !b.contains(" ve ") && !b.contains("/")) return b;
+        return "Belge";
+    }
+
+    /** "{no}. {tur} Taraflar:" → "2. Protokol Taraflar" (sondaki ':' olmadan). */
+    public static String grupTarafBasligi(FormVerisi f, int i) {
+        String bicim = nz(f.grupBasligi).isBlank() ? Ayarlar.CokluBelge.VARSAYILAN : f.grupBasligi;
+        String s = bicim.replace("{no}", String.valueOf(i + 1)).replace("{tur}", grupTuru(f, i)).trim();
+        return s.endsWith(":") ? s.substring(0, s.length() - 1).trim() : s;
+    }
+
+    /** Taraf başlığından türetilir: "2. Protokol Taraflar" → "2. Protokol Bedeli". */
+    public static String grupBedelBasligi(FormVerisi f, int i) {
+        String t = grupTarafBasligi(f, i);
+        if (t.endsWith("Taraflar")) return t.substring(0, t.length() - "Taraflar".length()) + "Bedeli";
+        return (i + 1) + ". " + grupTuru(f, i) + " Bedeli";
+    }
+
     public static String belgeTuru(FormVerisi f) {
         String b = f.belgeTuru == null ? "" : f.belgeTuru.trim();
         if (f.ikiDilli() && !b.contains("/") && BELGE_TURU_EN.containsKey(b)) {
@@ -419,7 +447,7 @@ public final class FormYazici {
     /** YOBF / YOBF_TR_EN: Taraflar + Konu + (Bedel) + (Not); her bölüm ayrı ayrı dahil edilebilir. */
     private void konuBlogu(XWPFTableCell c, FormVerisi f) {
         boolean en = f.ikiDilli();
-        boolean coklu = f.sozlesmeler.size() > 1;
+        boolean coklu = numaraliGruplar(f);
 
         if (f.dahil(Satirlar.TARAFLAR)) {
             for (int g = 0; g < f.sozlesmeler.size(); g++) {
@@ -427,7 +455,8 @@ public final class FormYazici {
                 List<String> taraflar = sg.taraflar.stream().filter(x -> x != null && !x.isBlank()).toList();
                 if (taraflar.isEmpty()) continue;
                 XWPFParagraph p = yeniParagraf(c);
-                String etiket = (coklu ? (g + 1) + ". Sözleşme " : "") + (en ? "Taraflar / Parties:" : "Taraflar:");
+                String etiket = coklu ? grupTarafBasligi(f, g) + (en ? " / Parties:" : ":")
+                        : (en ? "Taraflar / Parties:" : "Taraflar:");
                 run(p, etiket, true, false, true, GOVDE);
                 for (int i = 0; i < taraflar.size(); i++) {
                     XWPFParagraph tp = c.addParagraph();
@@ -459,8 +488,8 @@ public final class FormYazici {
                 List<Bedel> bl = f.sozlesmeler.get(g).bedeller.stream().filter(b -> !b.bos()).toList();
                 for (int i = 0; i < bl.size(); i++) {
                     XWPFParagraph bp = yeniParagraf(c);
-                    String etiket = coklu ? (g + 1) + ". Sözleşme Bedeli" : nz(f.bedelEtiketi, "Bedel");
-                    if (en) etiket += " / " + BEDEL_ETIKETI_EN.getOrDefault(coklu ? "Sözleşme Bedeli" : etiket, "Price");
+                    String etiket = coklu ? grupBedelBasligi(f, g) : nz(f.bedelEtiketi, "Bedel");
+                    if (en) etiket += " / " + (coklu ? "Price" : BEDEL_ETIKETI_EN.getOrDefault(etiket, "Price"));
                     if (i == 0) {
                         run(bp, etiket + ":", true, false, true, GOVDE);
                         run(bp, " " + bl.get(i).metin(), false, false, false, GOVDE);

@@ -46,7 +46,15 @@ public record OzetSemasi(
         List<String> dikkatHususlari,
 
         @JsonProperty("guven")
-        Guven guven) {
+        Guven guven,
+
+        @JsonProperty("belgeler")
+        @JsonPropertyDescription("Verilen her belgenin sıra numarası ve türü (tek belgede tek eleman).")
+        List<BelgeBilgisi> belgeler,
+
+        @JsonProperty("coklu_belge_iliskisi")
+        @JsonPropertyDescription("Birden fazla belgede: AYRI_BELGELER (bağımsız sözleşme/protokol vb., ör. aynı projede iki ayrı yükleniciyle iki sözleşme) veya AYNI_ISLEM (aynı işin/başvurunun parçaları, ör. dilekçe + taahhütname + yönetim kurulu kararı). Tek belgede boş.")
+        String cokluBelgeIliskisi) {
 
     public OzetSemasi {
         taraflar = taraflar == null ? List.of() : taraflar;
@@ -54,7 +62,16 @@ public record OzetSemasi(
         kisiler = kisiler == null ? List.of() : kisiler;
         dikkatHususlari = dikkatHususlari == null ? List.of() : dikkatHususlari;
         if (guven == null) guven = new Guven(0, 0);
+        belgeler = belgeler == null ? List.of() : belgeler;
+        if (cokluBelgeIliskisi == null) cokluBelgeIliskisi = "";
     }
+
+    public boolean ayniIslem() { return "AYNI_ISLEM".equalsIgnoreCase(cokluBelgeIliskisi.trim()); }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record BelgeBilgisi(
+            @JsonProperty("belge_no") @JsonPropertyDescription("Belgenin sıra numarası (1'den başlar)") int belgeNo,
+            @JsonProperty("belge_turu") @JsonPropertyDescription("Belgenin türü: Sözleşme, Protokol, Zeyilname, Taahhütname, Dilekçe, Yönetim Kurulu Kararı, Variation Order, Gizlilik Sözleşmesi … (belgenin kendi başlığına göre, kısa)") String belgeTuru) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Taraf(

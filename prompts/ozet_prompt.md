@@ -37,6 +37,13 @@ Gaziantep GES Projemizde gerçekleştirilecek "Geocell" imalatları kapsamında 
 TR: Finansman kapsamında Kalyon YEKA RES 3 Rüzgar Enerjisi Yatırımları A.Ş. iştirakimiz için Abu Dhabi Commercial Bank PJSC nezdinde hesap açılması, işletilmesi, bankacılık ve finansman hizmetlerinin sağlanması ile bu kapsamda gerekli yetkilendirmelerin yapılmasına ilişkin yönetim kurulu kararı onay ve imzanıza sunulmaktadır.
 EN: Within the scope of financing, the Board of Directors' resolution regarding the opening and operation of an account at Abu Dhabi Commercial Bank PJSC for our subsidiary Kalyon YEKA RES 3 Rüzgar Enerjisi Yatırımları A.Ş., the provision of banking and financing services, and the necessary authorizations in this regard is hereby submitted for your approval and signature.
 
+## Birden fazla belge
+- `belgeler` listesine her belgenin sıra numarasını ve kendi başlığındaki türünü yaz (Sözleşme, Protokol, Zeyilname, Taahhütname, Dilekçe, Yönetim Kurulu Kararı …).
+- `coklu_belge_iliskisi`:
+  - `AYRI_BELGELER`: belgeler ayrı ayrı imzalanacak bağımsız belgeler (ör. aynı projede iki farklı yükleniciyle iki sözleşme; bir sözleşme ve bir protokol). Taraflar ve bedeller belge numarasıyla ayrılır.
+  - `AYNI_ISLEM`: belgeler aynı işin/başvurunun parçaları (ör. dilekçe + taahhütname + yönetim kurulu kararı). Konu metni belgeleri birlikte anar: "… hazırlanan dilekçe, taahhütname ve yönetim kurulu kararı onay ve imzanıza sunulmaktadır."
+- Tek belgede `belgeler` tek elemanlı, `coklu_belge_iliskisi` boş.
+
 ## Bedel biçimi
 Türk sayı biçimi kullan: `650.000 TL + KDV`, `497.746,00 USD`, `145.000 EUR + KDV`. Belgede vergi notu varsa koru: `(KDV ve stopaj dahil değildir.)`.
 

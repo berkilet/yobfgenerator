@@ -62,6 +62,10 @@ public class DuzenlemePaneli extends JPanel {
     private final JTextArea taraflar = alan(4);
     private final JComboBox<String> bedelEtiketi = new JComboBox<>(new String[]{"Bedel", "Sözleşme Bedeli", "Zeyilnameye Konu Tutar"});
     private final JTextArea bedeller = alan(2);
+    private final javax.swing.JRadioButton ayriBelgeler = new javax.swing.JRadioButton("Ayrı belgeler (numaralı gruplar)", true);
+    private final javax.swing.JRadioButton ayniIslem = new javax.swing.JRadioButton("Aynı işleme ait belgeler (tek liste)");
+    private final JTextField grupTurleri = new JTextField();
+    private final JComboBox<String> grupBasligi;
 
     private final JTextArea kisiler = alan(2);
     private final JTextArea sirketler = alan(4);
@@ -111,6 +115,9 @@ public class DuzenlemePaneli extends JPanel {
         yetkililer.addAll(y.imzacilar().imzasinaSunulacakYetkililer());
         yetkiliSecici = new JComboBox<>(yetkililer.toArray(new String[0]));
         imzaciPaneli = new ImzaciPaneli(y.imzacilar(), a.imzaBlogu());
+        grupBasligi = new JComboBox<>(a.cokluBelge().baslikSecenekleri().toArray(new String[0]));
+        grupBasligi.setEditable(true);
+        grupBasligi.setSelectedItem(a.cokluBelge().baslikBicimi());
 
         int r = 0;
         r = satir(r, "Form türü", formTuru, null);
@@ -119,8 +126,8 @@ public class DuzenlemePaneli extends JPanel {
         r = satir(r, "Talep Eden Departman", talepEden, Satirlar.TALEP_EDEN);
         r = satir(r, "İmzaya Sunan Departman", imzayaSunan, Satirlar.IMZAYA_SUNAN);
 
-        r = satir(r, "<html>Taraflar<br><small>her satıra bir taraf;<br>çoklu sözleşmede<br>gruplar arası \"---\"</small></html>",
-                kaydir(taraflar), Satirlar.TARAFLAR, yobfAlanlari);
+        r = satir(r, "<html>Taraflar<br><small>her satıra bir taraf;<br>birden fazla belgede<br>gruplar arası \"---\"</small></html>",
+                tarafPaneli(), Satirlar.TARAFLAR, yobfAlanlari);
         JPanel bedelPanel = new JPanel(new BorderLayout(4, 4));
         bedelPanel.add(bedelEtiketi, BorderLayout.NORTH);
         bedelPanel.add(kaydir(bedeller), BorderLayout.CENTER);
@@ -198,6 +205,81 @@ public class DuzenlemePaneli extends JPanel {
         logoOnizlemeGuncelle();
         formTuruDegisti();
         konuSay();
+    }
+
+    /** Taraflar alanı + birden fazla belge seçenekleri (ilişki, grup türleri, başlık biçimi). */
+    private JPanel tarafPaneli() {
+        javax.swing.ButtonGroup bg = new javax.swing.ButtonGroup();
+        bg.add(ayriBelgeler);
+        bg.add(ayniIslem);
+        ayriBelgeler.setToolTipText("Ör. aynı projede iki ayrı yükleniciyle iki sözleşme: "
+                + "\"1. Sözleşme Taraflar:\", \"2. Protokol Taraflar:\" …");
+        ayniIslem.setToolTipText("Ör. dilekçe + taahhütname + yönetim kurulu kararı: taraflar tek listede, tekrarsız");
+        grupTurleri.setToolTipText("Her \"---\" grubunun belge türü, sırayla ve virgülle: ör. Sözleşme, Protokol");
+        grupBasligi.setToolTipText("{no} = sıra numarası, {tur} = grubun belge türü. Elle de yazabilirsiniz.");
+
+        JPanel secim = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        secim.add(new JLabel("Birden fazla belge:"));
+        secim.add(ayriBelgeler);
+        secim.add(ayniIslem);
+
+        JPanel turler = new JPanel(new GridBagLayout());
+        GridBagConstraints c = new GridBagConstraints();
+        c.insets = new Insets(2, 0, 2, 6);
+        c.anchor = GridBagConstraints.WEST;
+        turler.add(new JLabel("Grup türleri:"), c);
+        c.gridx = 1;
+        c.weightx = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        turler.add(grupTurleri, c);
+        c.gridx = 0;
+        c.gridy = 1;
+        c.weightx = 0;
+        c.fill = GridBagConstraints.NONE;
+        turler.add(new JLabel("Grup başlığı:"), c);
+        c.gridx = 1;
+        c.weightx = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        turler.add(grupBasligi, c);
+        c.gridx = 0;
+        c.gridy = 2;
+        c.gridwidth = 2;
+        turler.add(new JLabel("<html><small>{no} = sıra, {tur} = grubun türü (model algılar, değiştirebilirsiniz). "
+                + "Ör. \"{no}. Evrak ({tur}) Taraflar:\" → \"1. Evrak (Sözleşme) Taraflar:\"</small></html>"), c);
+
+        JPanel alt = new JPanel(new BorderLayout(0, 2));
+        alt.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
+        alt.add(secim, BorderLayout.NORTH);
+        alt.add(turler, BorderLayout.CENTER);
+
+        java.awt.event.ActionListener al = e -> { grupAlanlariDurumu(); degisti.run(); };
+        ayriBelgeler.addActionListener(al);
+        ayniIslem.addActionListener(al);
+        grupBasligi.addActionListener(e -> degisti.run());
+        grupTurleri.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { degisti.run(); }
+            public void removeUpdate(DocumentEvent e) { degisti.run(); }
+            public void changedUpdate(DocumentEvent e) { degisti.run(); }
+        });
+        DocumentListener tarafDegisti = new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { degisti.run(); }
+            public void removeUpdate(DocumentEvent e) { degisti.run(); }
+            public void changedUpdate(DocumentEvent e) { degisti.run(); }
+        };
+        taraflar.getDocument().addDocumentListener(tarafDegisti);
+        bedeller.getDocument().addDocumentListener(tarafDegisti);
+
+        JPanel p = new JPanel(new BorderLayout(0, 2));
+        p.add(kaydir(taraflar), BorderLayout.CENTER);
+        p.add(alt, BorderLayout.SOUTH);
+        return p;
+    }
+
+    /** "Aynı işleme ait" seçiliyken grup türü ve başlık kullanılmaz. */
+    private void grupAlanlariDurumu() {
+        boolean ayri = ayriBelgeler.isSelected() && ayriBelgeler.isEnabled();
+        grupTurleri.setEnabled(ayri);
+        grupBasligi.setEnabled(ayri);
     }
 
     // ---------------------------------------------------------------- yerleşim yardımcıları
@@ -480,6 +562,11 @@ public class DuzenlemePaneli extends JPanel {
             taraflar.setText(String.join(ayrac, tg));
             bedeller.setText(bg.stream().allMatch(String::isBlank) ? "" : String.join(ayrac, bg));
             bedelEtiketi.setSelectedItem(f.bedelEtiketi);
+            (f.ayniIslem ? ayniIslem : ayriBelgeler).setSelected(true);
+            grupTurleri.setText(String.join(", ", f.sozlesmeler.stream().map(g -> g.belgeTuru == null ? "" : g.belgeTuru).toList())
+                    .replaceAll("^(, )+$", ""));
+            grupBasligi.setSelectedItem(f.grupBasligi == null || f.grupBasligi.isBlank()
+                    ? y.ayarlar().cokluBelge().baslikBicimi() : f.grupBasligi);
             kisiler.setText(String.join(", ", f.kisiler));
             sirketler.setText(String.join("\n", f.sirketler));
             sonaErme.setText(f.sonaErmeTarihi);
@@ -500,6 +587,7 @@ public class DuzenlemePaneli extends JPanel {
             yukleniyor = false;
         }
         satirDurumlariniUygula();
+        grupAlanlariDurumu();
         formTuruDegisti();
     }
 
@@ -513,12 +601,26 @@ public class DuzenlemePaneli extends JPanel {
         f.imzayaSunanDepartman = metin(imzayaSunan);
         List<List<String>> tg = gruplar(taraflar.getText());
         List<List<String>> bg = gruplar(bedeller.getText());
-        int n = Math.max(tg.size(), bg.size());
-        for (int i = 0; i < Math.max(1, n); i++) {
+        f.ayniIslem = ayniIslem.isSelected();
+        f.grupBasligi = metin(grupBasligi);
+        if (f.ayniIslem) {
+            // Aynı işleme ait belgeler: tüm gruplar tek listede, tekrarsız
             SozlesmeGrubu g = new SozlesmeGrubu();
-            if (i < tg.size()) g.taraflar.addAll(tg.get(i));
-            if (i < bg.size()) bg.get(i).forEach(b -> g.bedeller.add(Bedel.metindenOlustur(b)));
+            tg.forEach(l -> l.forEach(t -> {
+                if (g.taraflar.stream().noneMatch(x -> legal.erk.yobf.rules.UnvanNormalizer.ayniMi(x, t))) g.taraflar.add(t);
+            }));
+            bg.forEach(l -> l.forEach(b -> g.bedeller.add(Bedel.metindenOlustur(b))));
             f.sozlesmeler.add(g);
+        } else {
+            List<String> turler = Arrays.stream(grupTurleri.getText().split(",")).map(String::trim).toList();
+            int n = Math.max(tg.size(), bg.size());
+            for (int i = 0; i < Math.max(1, n); i++) {
+                SozlesmeGrubu g = new SozlesmeGrubu();
+                if (i < tg.size()) g.taraflar.addAll(tg.get(i));
+                if (i < bg.size()) bg.get(i).forEach(b -> g.bedeller.add(Bedel.metindenOlustur(b)));
+                if (i < turler.size()) g.belgeTuru = turler.get(i);
+                f.sozlesmeler.add(g);
+            }
         }
         f.bedelEtiketi = metin(bedelEtiketi);
         Arrays.stream(kisiler.getText().split("[,\\n]")).map(String::trim).filter(s -> !s.isEmpty()).forEach(f.kisiler::add);

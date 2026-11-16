@@ -87,7 +87,8 @@ public final class ClaudeIstemci implements AutoCloseable {
             o = new OzetSemasi(o.belgeTuru(), o.formTuruOnerisi(), o.taraflar(),
                     k.konuTr() == null || k.konuTr().isBlank() ? o.konuTr() : k.konuTr(),
                     ikiDilli && k.konuEn() != null && !k.konuEn().isBlank() ? k.konuEn() : o.konuEn(),
-                    o.bedel(), o.kisiler(), o.sonaErmeTarihi(), o.dikkatHususlari(), o.guven());
+                    o.bedel(), o.kisiler(), o.sonaErmeTarihi(), o.dikkatHususlari(), o.guven(),
+                    o.belgeler(), o.cokluBelgeIliskisi());
         }
         return o;
     }
@@ -141,9 +142,17 @@ public final class ClaudeIstemci implements AutoCloseable {
     String kullaniciMesaji(List<Belge> belgeler, boolean ikiDilli) {
         StringBuilder b = new StringBuilder();
         if (belgeler.size() > 1) {
-            b.append("Aşağıda tek bir forma bağlanacak ").append(belgeler.size())
-                    .append(" ayrı belge var. Her taraf ve bedel için belge_no alanına belgenin sıra numarasını yaz. ")
-                    .append("konu_tr tek ve ortak olmalıdır.\n\n");
+            b.append("Aşağıda tek bir forma bağlanacak ").append(belgeler.size()).append(" belge var.\n")
+                    .append("- belgeler listesine her belgenin sıra numarasını ve türünü yaz (belgenin kendi başlığına göre: ")
+                    .append("Sözleşme, Protokol, Zeyilname, Taahhütname, Dilekçe, Yönetim Kurulu Kararı vb.).\n")
+                    .append("- coklu_belge_iliskisi: belgeler ayrı ayrı imzalanacak bağımsız belgelerse (ör. aynı projede iki ")
+                    .append("farklı yükleniciyle iki sözleşme) AYRI_BELGELER; aynı işin/başvurunun parçalarıysa ")
+                    .append("(ör. dilekçe + taahhütname + yönetim kurulu kararı) AYNI_ISLEM yaz.\n")
+                    .append("- Her taraf ve bedel için belge_no alanına ait olduğu belgenin sıra numarasını yaz.\n")
+                    .append("- konu_tr tek ve ortak olmalıdır; AYNI_ISLEM ise belgeleri birlikte an ")
+                    .append("(ör. \"… hazırlanan dilekçe, taahhütname ve yönetim kurulu kararı onay ve imzanıza sunulmaktadır.\").\n\n");
+        } else {
+            b.append("Tek belge var: belgeler listesine tek eleman (belge_no 1 ve türü) yaz, coklu_belge_iliskisi boş kalsın.\n\n");
         }
         b.append(ikiDilli
                 ? "Form iki dilli (TR/EN) hazırlanacak: konu_en alanına konu_tr'nin resmi İngilizce karşılığını yaz.\n\n"

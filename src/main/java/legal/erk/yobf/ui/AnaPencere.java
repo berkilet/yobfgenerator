@@ -162,7 +162,7 @@ public class AnaPencere extends JFrame {
     private JPanel belgeAlani() {
         JPanel p = new JPanel(new BorderLayout(6, 6));
         p.setBorder(BorderFactory.createTitledBorder("Belgeler — PDF / DOCX dosyalarını buraya sürükleyin "
-                + "(birden fazla belge = tek forma bağlı birden fazla sözleşme)"));
+                + "(birden fazla belge tek forma bağlanır: ayrı belgeler veya aynı işleme ait belgeler)"));
         belgeListesi.setVisibleRowCount(3);
         belgeListesi.setCellRenderer((l, v, i, sec, odak) -> {
             JLabel r = new JLabel((i + 1) + ". " + v.getFileName() + "   (" + v.getParent() + ")");
@@ -395,6 +395,7 @@ public class AnaPencere extends JFrame {
                     f.ekSatirlar.addAll(mevcut.ekSatirlar);
                     f.notMetni = mevcut.notMetni;
                     f.notEtiketi = mevcut.notEtiketi;
+                    if (!mevcut.grupBasligi.isBlank()) f.grupBasligi = mevcut.grupBasligi;
                     if (!mevcut.imzayaSunanDepartman.isBlank()) f.imzayaSunanDepartman = mevcut.imzayaSunanDepartman;
                     panel.yukle(f);
                     dikkat.clear();

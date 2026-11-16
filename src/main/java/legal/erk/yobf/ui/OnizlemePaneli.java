@@ -374,13 +374,14 @@ public class OnizlemePaneli extends JPanel {
         }
 
         List<Paragraf> konuBlogu() {
-            boolean en = f.ikiDilli(), coklu = f.sozlesmeler.size() > 1;
+            boolean en = f.ikiDilli(), coklu = FormYazici.numaraliGruplar(f);
             List<Paragraf> d = new ArrayList<>();
             if (f.dahil(Satirlar.TARAFLAR)) {
                 for (int gi = 0; gi < f.sozlesmeler.size(); gi++) {
                     List<String> t = f.sozlesmeler.get(gi).taraflar.stream().filter(s -> s != null && !s.isBlank()).toList();
                     if (t.isEmpty()) continue;
-                    d.add(Paragraf.of(0, p((coklu ? (gi + 1) + ". Sözleşme " : "") + (en ? "Taraflar / Parties:" : "Taraflar:"),
+                    d.add(Paragraf.of(0, p(coklu ? FormYazici.grupTarafBasligi(f, gi) + (en ? " / Parties:" : ":")
+                                    : (en ? "Taraflar / Parties:" : "Taraflar:"),
                             true, false, true, FormYazici.GOVDE)));
                     for (int i = 0; i < t.size(); i++) d.add(Paragraf.of(coklu ? 25 : 18, duz((i + 1) + ") " + t.get(i))));
                 }
@@ -401,8 +402,8 @@ public class OnizlemePaneli extends JPanel {
                     SozlesmeGrubu sg = f.sozlesmeler.get(gi);
                     List<Bedel> bl = sg.bedeller.stream().filter(b -> !b.bos()).toList();
                     for (int i = 0; i < bl.size(); i++) {
-                        String et = coklu ? (gi + 1) + ". Sözleşme Bedeli" : nz(f.bedelEtiketi).isBlank() ? "Bedel" : f.bedelEtiketi;
-                        if (en) et += " / " + FormYazici.BEDEL_ETIKETI_EN.getOrDefault(coklu ? "Sözleşme Bedeli" : et, "Price");
+                        String et = coklu ? FormYazici.grupBedelBasligi(f, gi) : nz(f.bedelEtiketi).isBlank() ? "Bedel" : f.bedelEtiketi;
+                        if (en) et += " / " + (coklu ? "Price" : FormYazici.BEDEL_ETIKETI_EN.getOrDefault(et, "Price"));
                         d.add(i == 0
                                 ? Paragraf.of(0, p(et + ":", true, false, true, FormYazici.GOVDE), duz(" " + bl.get(i).metin()))
                                 : Paragraf.of(18, duz(bl.get(i).metin())));

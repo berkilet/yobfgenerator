@@ -94,7 +94,10 @@ Logo, başlığın üstünde ortalanır; yükseklik sabit (≈ 2,2 cm), en-boy o
 ### 5.3 Bedel
 - Ayrı alan; etiketi belge türüne göre: `Bedel`, `Sözleşme Bedeli`, `Zeyilnameye Konu Tutar`.
 - Türk sayı biçimi: `3.570.000 TL + KDV`, `497.746,00 USD`, `145.000 EUR + KDV`. Vergi notu belgedeki gibi korunur: `(KDV ve stopaj dahil değildir.)`.
-- **Çoklu sözleşme:** Birden fazla belge tek forma bağlanıyorsa Taraflar ve Bedel numaralı gruplar halinde yazılır: `1. Sözleşme Taraflar:` / `2. Sözleşme Taraflar:` ve `1. Sözleşme Bedeli:` / `2. Sözleşme Bedeli:`; Konu tek ve ortak olur (Geocell örneği).
+- **Birden fazla belge:** Model her belgenin türünü (`belgeler`) ve ilişkisini (`coklu_belge_iliskisi`) döndürür; kullanıcı düzenleme ekranında değiştirebilir.
+  - *Ayrı belgeler* (ör. aynı projede iki ayrı yükleniciyle iki sözleşme; Geocell örneği): Taraflar ve Bedel numaralı gruplar halinde, başlıkta grubun belge türüyle yazılır: `1. Sözleşme Taraflar:` / `2. Protokol Taraflar:` ve `1. Sözleşme Bedeli:` / `2. Protokol Bedeli:`. Başlık biçimi `ayarlar.json → coklu_belge.baslik_bicimi` (`{no}`, `{tur}`), arayüzden seçilir/yazılır (ör. `{no}. Evrak ({tur}) Taraflar:`).
+  - *Aynı işleme ait belgeler* (ör. dilekçe + taahhütname + YK kararı): Taraflar tek listede, tekrarsız; Bedel numarasız; Belge Türü tüm türleri sayar ("Dilekçe, Taahhütname ve Yönetim Kurulu Kararı").
+  - Her iki durumda Konu tek ve ortaktır.
 
 ### 5.4 Not
 - Opsiyonel; etiket seçilebilir: `Not:` veya `Müşavirliğimizin Notu:`. İtalik.

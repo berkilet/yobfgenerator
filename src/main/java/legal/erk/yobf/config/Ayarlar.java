@@ -13,6 +13,7 @@ public record Ayarlar(
         @JsonProperty("model") String model,
         @JsonProperty("modeller") List<ModelSecenegi> modeller,
         @JsonProperty("konu_max_karakter") int konuMaxKarakter,
+        @JsonProperty("coklu_belge") CokluBelge cokluBelge,
         @JsonProperty("konu_sinir_sert") boolean konuSinirSert,
         @JsonProperty("kisaltma_deneme_sayisi") int kisaltmaDenemeSayisi,
         @JsonProperty("maskeleme") Maskeleme maskeleme,
@@ -28,6 +29,7 @@ public record Ayarlar(
 
     public Ayarlar {
         if (konuMaxKarakter <= 0) konuMaxKarakter = 400;
+        if (cokluBelge == null) cokluBelge = new CokluBelge(null, null);
         if (kisaltmaDenemeSayisi < 0) kisaltmaDenemeSayisi = 0;
         if (maskeleme == null) maskeleme = new Maskeleme(true, true, true, true);
         if (proxy == null) proxy = new Proxy("", 0);
@@ -44,6 +46,20 @@ public record Ayarlar(
             modeller = List.of(new ModelSecenegi(model, model, sunucuTarafiYedekModel));
         } else {
             modeller = List.copyOf(modeller);
+        }
+    }
+
+    /** Çoklu belgede grup başlığı biçimi ve arayüzdeki hazır seçenekler. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record CokluBelge(
+            @JsonProperty("baslik_bicimi") String baslikBicimi,
+            @JsonProperty("baslik_secenekleri") List<String> baslikSecenekleri) {
+        public static final String VARSAYILAN = "{no}. {tur} Taraflar:";
+        public CokluBelge {
+            if (baslikBicimi == null || baslikBicimi.isBlank()) baslikBicimi = VARSAYILAN;
+            baslikSecenekleri = baslikSecenekleri == null || baslikSecenekleri.isEmpty()
+                    ? List.of(VARSAYILAN, "{no}. Evrak ({tur}) Taraflar:", "{no}. Belge Taraflar:")
+                    : List.copyOf(baslikSecenekleri);
         }
     }
 

@@ -43,27 +43,51 @@ public final class FormHazirlayici {
             f.sirketler.addAll(sirala(o.taraflar().stream().map(OzetSemasi.Taraf::unvan).toList()));
             f.sonaErmeTarihi = nz(o.sonaErmeTarihi()).trim();
         } else {
-            TreeMap<Integer, SozlesmeGrubu> gruplar = new TreeMap<>();
             int max = Math.max(1, belgeSayisi);
+            // belge_no → tür (modelin algıladığı, ayarlar.json listesine eşlenmiş)
+            TreeMap<Integer, String> turler = new TreeMap<>();
+            for (OzetSemasi.BelgeBilgisi bb : o.belgeler()) {
+                int no = Math.min(max, Math.max(1, bb.belgeNo()));
+                turler.putIfAbsent(no, belgeTuru(bb.belgeTuru(), f.formTuru));
+            }
+            f.grupBasligi = y.ayarlar().cokluBelge().baslikBicimi();
+            f.ayniIslem = belgeSayisi > 1 && o.ayniIslem();
+
+            TreeMap<Integer, SozlesmeGrubu> gruplar = new TreeMap<>();
             for (OzetSemasi.Taraf t : o.taraflar()) {
-                int no = Math.min(max, Math.max(1, t.belgeNo()));
+                int no = f.ayniIslem ? 1 : Math.min(max, Math.max(1, t.belgeNo()));
                 gruplar.computeIfAbsent(no, k -> new SozlesmeGrubu()).taraflar.add(t.unvan());
             }
             for (OzetSemasi.BedelOge b : o.bedel()) {
-                int no = Math.min(max, Math.max(1, b.belgeNo()));
+                int no = f.ayniIslem ? 1 : Math.min(max, Math.max(1, b.belgeNo()));
                 gruplar.computeIfAbsent(no, k -> new SozlesmeGrubu()).bedeller
                         .add(new Bedel(b.tutar(), b.paraBirimi(), b.vergiNotu()));
             }
             if (gruplar.isEmpty()) gruplar.put(1, new SozlesmeGrubu());
-            for (SozlesmeGrubu g : gruplar.values()) {
+            for (var e : gruplar.entrySet()) {
+                SozlesmeGrubu g = e.getValue();
                 List<String> s = sirala(g.taraflar);
                 g.taraflar.clear();
                 g.taraflar.addAll(s);
+                g.belgeTuru = f.ayniIslem ? "" : turler.getOrDefault(e.getKey(), "");
                 f.sozlesmeler.add(g);
             }
+            // Birden fazla belgede üstteki "Belge Türü": tüm türler (ör. "Dilekçe, Taahhütname ve Yönetim Kurulu Kararı")
+            if (belgeSayisi > 1 && !turler.isEmpty()) f.belgeTuru = birlestir(new ArrayList<>(turler.values()));
             f.bedelEtiketi = bedelEtiketi(o, f.belgeTuru);
         }
         return f;
+    }
+
+    /** ["Sözleşme","Protokol","Sözleşme"] → "Sözleşme ve Protokol"; üç ve fazlası "A, B ve C". */
+    public static String birlestir(List<String> turler) {
+        List<String> tekil = new ArrayList<>();
+        for (String t : turler) {
+            if (t == null || t.isBlank()) continue;
+            if (tekil.stream().noneMatch(x -> UnvanNormalizer.asciiKucuk(x).equals(UnvanNormalizer.asciiKucuk(t)))) tekil.add(t.trim());
+        }
+        if (tekil.size() <= 1) return tekil.isEmpty() ? "" : tekil.get(0);
+        return String.join(", ", tekil.subList(0, tekil.size() - 1)) + " ve " + tekil.get(tekil.size() - 1);
     }
 
     /** Grup şirketleri kanonik unvanla ve önce; tekrarlar atılır. */

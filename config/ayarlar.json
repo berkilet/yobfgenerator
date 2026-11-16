@@ -5,6 +5,12 @@
     { "id": "claude-sonnet-5-5", "ad": "Sonnet 5.5 — daha güçlü", "yedek_model": true }
   ],
   "konu_max_karakter": 400,
+
+  "coklu_belge": {
+    "_aciklama": "Birden fazla belge tek forma bağlandığında grup başlığı. {no}: sıra numarası, {tur}: belge türü (model algılar, kullanıcı değiştirebilir). Bedel başlığı 'Taraflar' yerine 'Bedeli' ile türetilir.",
+    "baslik_bicimi": "{no}. {tur} Taraflar:",
+    "baslik_secenekleri": ["{no}. {tur} Taraflar:", "{no}. Evrak ({tur}) Taraflar:", "{no}. Belge ({tur}) Taraflar:", "{no}. Belge Taraflar:", "{no}. Sözleşme Taraflar:"]
+  },
   "konu_sinir_sert": true,
   "kisaltma_deneme_sayisi": 2,
   "maskeleme": { "tckn": true, "iban": true, "telefon": true, "eposta": true },
