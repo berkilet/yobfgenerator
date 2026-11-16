@@ -48,6 +48,10 @@ public final class Tercihler {
 
     public void wordDeSaklaAyarla(boolean b) { veri.put("word_de_sakla", b); kaydet(); }
 
+    public boolean koyuTema() { return veri.path("koyu_tema").asBoolean(false); }
+
+    public void koyuTemaAyarla(boolean b) { veri.put("koyu_tema", b); kaydet(); }
+
     private void kaydet() {
         try {
             Files.createDirectories(dosya.getParent());

@@ -21,6 +21,7 @@ import legal.erk.yobf.render.FormYazici;
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -57,7 +58,6 @@ public class AnaPencere extends JFrame {
 
     private Yapilandirma y;
     private final DefaultListModel<Path> belgeler = new DefaultListModel<>();
-    private final JList<Path> belgeListesi = new JList<>(belgeler);
     private final DefaultListModel<Uyari> uyarilar = new DefaultListModel<>();
     private final DefaultListModel<String> dikkat = new DefaultListModel<>();
     private final JLabel durum = new JLabel(" ");
@@ -74,123 +74,187 @@ public class AnaPencere extends JFrame {
     /** Son analizdeki maskeli kaynak metin (doğrulama için). Maskelenen değerler modele gitmez. */
     private String kaynakMetin;
 
+    private final JLabel[] adimlar = new JLabel[3];
+    private int aktifAdim = 1;
+    private final javax.swing.JProgressBar analizIlerleme = new javax.swing.JProgressBar();
+    private final JPanel belgeEtiketleri = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 6));
+    private BirakmaAlani birakmaAlani;
+    private final JButton temaDugmesi = new JButton();
+    private final JButton dogrula = new JButton("Doğrula");
+
     public AnaPencere(Yapilandirma y) {
         super("YÖBF Otomatörü");
         this.y = y;
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setIconImages(Ikonlar.liste());
-        setJMenuBar(menu());
-        setLayout(new BorderLayout(6, 6));
+        setLayout(new BorderLayout());
+        getRootPane().putClientProperty("JRootPane.titleBarBackground", Tema.ustBant());
+        getRootPane().putClientProperty("JRootPane.titleBarForeground", Color.WHITE);
 
-        add(belgeAlani(), BorderLayout.NORTH);
+        add(ustBant(), BorderLayout.NORTH);
 
         panel = new DuzenlemePaneli(y);
         panel.degisinceCalistir(this::canliDogrula);
-        panelKaydirma = new JScrollPane(panel);
-        panelKaydirma.getVerticalScrollBar().setUnitIncrement(16);
-        panelKaydirma.setBorder(BorderFactory.createTitledBorder("Düzenleme — kutucuğu işaretli satırlar forma dahil edilir"));
+        JPanel sol = new JPanel(new BorderLayout(0, 12));
+        sol.setOpaque(false);
+        sol.add(belgeKarti(), BorderLayout.NORTH);
+        sol.add(panel, BorderLayout.CENTER);
+        JPanel solKenar = new JPanel(new BorderLayout());
+        solKenar.setOpaque(false);
+        solKenar.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 8));
+        solKenar.add(sol, BorderLayout.CENTER);
+        panelKaydirma = new JScrollPane(solKenar);
+        panelKaydirma.setBorder(BorderFactory.createEmptyBorder());
+        panelKaydirma.getVerticalScrollBar().setUnitIncrement(18);
 
-        JSplitPane bolme = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, panelKaydirma, yanPanel());
-        bolme.setResizeWeight(0.7);
+        JPanel sag = new JPanel(new BorderLayout());
+        sag.setBorder(BorderFactory.createEmptyBorder(16, 8, 16, 16));
+        sag.add(yanPanel(), BorderLayout.CENTER);
+
+        JSplitPane bolme = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, panelKaydirma, sag);
+        bolme.setResizeWeight(0.62);
+        bolme.setBorder(BorderFactory.createEmptyBorder());
+        bolme.setContinuousLayout(true);
         add(bolme, BorderLayout.CENTER);
 
-        JPanel alt = new JPanel(new BorderLayout());
-        alt.setBorder(BorderFactory.createEmptyBorder(4, 8, 6, 8));
-        alt.add(durum, BorderLayout.CENTER);
-        JButton dogrula = new JButton("Doğrula");
-        dogrula.addActionListener(e -> canliDogrula());
-        JPanel btn = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        btn.add(dogrula);
-        btn.add(wordOlustur);
-        btn.add(pdfOlusturBtn);
-        alt.add(btn, BorderLayout.EAST);
-        add(alt, BorderLayout.SOUTH);
+        add(eylemCubugu(), BorderLayout.SOUTH);
 
         wordOlustur.addActionListener(e -> olustur(false));
         pdfOlusturBtn.addActionListener(e -> olustur(true));
         pdfOlusturBtn.setToolTipText("Formu doğrudan PDF olarak kaydeder (bilgisayardaki Microsoft Word ile; yoksa LibreOffice)");
-        setSize(new Dimension(1280, 860));
+        stilleriUygula();
+        setSize(new Dimension(1360, 900));
+        setMinimumSize(new Dimension(1040, 680));
         setLocationRelativeTo(null);
 
         bosForm();
+        adim(1);
         if (ApiAnahtari.oku().isEmpty()) {
-            durum("API anahtarı tanımlı değil — Ayarlar > API Anahtarı… (formu elle de doldurabilirsiniz)");
+            durum("API anahtarı tanımlı değil — ☰ menü › Ayarlar › API Anahtarı… (formu elle de doldurabilirsiniz)");
         }
     }
 
     // ---------------------------------------------------------------- arayüz parçaları
 
-    private JMenuBar menu() {
-        JMenuBar mb = new JMenuBar();
-        JMenu dosya = new JMenu("Dosya");
-        JMenuItem ekle = new JMenuItem("Belge Ekle…");
-        ekle.addActionListener(e -> belgeSec());
-        JMenuItem bos = new JMenuItem("Yeni Boş Form");
-        bos.addActionListener(e -> bosForm());
-        JMenuItem gunluk = new JMenuItem("İşlem Günlüğünü Aç");
-        gunluk.addActionListener(e -> ac(IslemGunlugu.varsayilan().dosya()));
-        JMenuItem cik = new JMenuItem("Çıkış");
-        cik.addActionListener(e -> dispose());
-        JMenuItem wordMenu = new JMenuItem("Word Olarak Oluştur…");
-        wordMenu.addActionListener(e -> olustur(false));
-        JMenuItem pdfMenu = new JMenuItem("PDF Olarak Oluştur…");
-        pdfMenu.addActionListener(e -> olustur(true));
-        dosya.add(ekle);
-        dosya.add(bos);
-        dosya.addSeparator();
-        dosya.add(wordMenu);
-        dosya.add(pdfMenu);
-        dosya.addSeparator();
-        dosya.add(gunluk);
-        dosya.addSeparator();
-        dosya.add(cik);
+    /** Lacivert üst bant: simge + başlık, adım göstergesi, tema ve menü düğmeleri. */
+    private JPanel ustBant() {
+        JPanel bant = new JPanel(new BorderLayout(16, 0)) {
+            @Override protected void paintComponent(java.awt.Graphics g) {
+                g.setColor(Tema.ustBant());
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+        };
+        bant.setBorder(BorderFactory.createEmptyBorder(10, 18, 10, 14));
 
-        JMenu ayar = new JMenu("Ayarlar");
-        JMenuItem anahtar = new JMenuItem("API Anahtarı…");
-        anahtar.addActionListener(e -> anahtarGir());
-        JMenuItem yenile = new JMenuItem("Yapılandırmayı Yeniden Yükle");
-        yenile.addActionListener(e -> yapilandirmayiYenile());
-        JMenuItem klasor = new JMenuItem("Uygulama Klasörünü Aç");
-        klasor.addActionListener(e -> ac(UygulamaYolu.kok()));
-        ayar.add(anahtar);
-        ayar.add(yenile);
-        ayar.add(klasor);
+        JLabel simge = new JLabel(new javax.swing.ImageIcon(Ikonlar.liste().isEmpty() ? new java.awt.image.BufferedImage(1, 1, 2)
+                : Ikonlar.liste().get(Ikonlar.liste().size() - 1).getScaledInstance(34, 34, java.awt.Image.SCALE_SMOOTH)));
+        JLabel baslik = new JLabel("YÖBF Otomatörü");
+        baslik.setForeground(Color.WHITE);
+        baslik.setFont(baslik.getFont().deriveFont(java.awt.Font.BOLD, 17f));
+        JLabel alt = new JLabel("Yönetici Özet Bilgilendirme Formu");
+        alt.setForeground(new Color(255, 255, 255, 170));
+        alt.setFont(alt.getFont().deriveFont(12f));
+        JPanel yazi = new JPanel(new java.awt.GridLayout(2, 1));
+        yazi.setOpaque(false);
+        yazi.add(baslik);
+        yazi.add(alt);
+        JPanel solTaraf = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        solTaraf.setOpaque(false);
+        solTaraf.add(simge);
+        solTaraf.add(yazi);
+        bant.add(solTaraf, BorderLayout.WEST);
 
-        JMenu yardim = new JMenu("Yardım");
-        JMenuItem hakkinda = new JMenuItem("Hakkında");
-        hakkinda.addActionListener(e -> JOptionPane.showMessageDialog(this,
-                "YÖBF Otomatörü\nYönetici Özet Bilgilendirme Formu hazırlama aracı.\n\n"
-                        + "Model: " + y.ayarlar().model() + "\nUygulama klasörü: " + UygulamaYolu.kok()
-                        + "\nAPI anahtarı dosyası: " + ApiAnahtari.dosya(),
-                "Hakkında", JOptionPane.INFORMATION_MESSAGE));
-        yardim.add(hakkinda);
+        JPanel orta = new JPanel(new java.awt.GridBagLayout());
+        orta.setOpaque(false);
+        String[] adlar = {"Belge", "Düzenle", "Onay ve kayıt"};
+        JPanel satir = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        satir.setOpaque(false);
+        for (int i = 0; i < 3; i++) {
+            if (i > 0) {
+                JLabel cizgi = new JLabel("──────");
+                cizgi.setForeground(new Color(255, 255, 255, 90));
+                cizgi.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
+                satir.add(cizgi);
+            }
+            adimlar[i] = new AdimEtiketi((i + 1) + "   " + adlar[i]);
+            adimlar[i].setBorder(BorderFactory.createEmptyBorder(5, 12, 5, 14));
+            adimlar[i].setFont(adimlar[i].getFont().deriveFont(java.awt.Font.BOLD, 12.5f));
+            satir.add(adimlar[i]);
+        }
+        orta.add(satir);
+        bant.add(orta, BorderLayout.CENTER);
 
-        mb.add(dosya);
-        mb.add(ayar);
-        mb.add(yardim);
-        return mb;
+        JPanel sagTaraf = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        sagTaraf.setOpaque(false);
+        temaDugmesi.setToolTipText("Açık / koyu tema");
+        temaDugmesi.addActionListener(e -> {
+            boolean koyu = !Tema.koyu();
+            Tema.degistir(koyu);
+            tercihler.koyuTemaAyarla(koyu);
+            stilleriUygula();
+        });
+        JButton menuDugmesi = new JButton(Simgeler.al("menu", 18, Color.WHITE));
+        menuDugmesi.setToolTipText("Menü");
+        javax.swing.JPopupMenu menu = menu();
+        menuDugmesi.addActionListener(e -> menu.show(menuDugmesi, menuDugmesi.getWidth() - menu.getPreferredSize().width,
+                menuDugmesi.getHeight() + 4));
+        for (JButton b : new JButton[]{temaDugmesi, menuDugmesi}) {
+            b.putClientProperty(com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE,
+                    com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+            b.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE,
+                    "hoverBackground:#FFFFFF22;pressedBackground:#FFFFFF33;arc:10");
+            sagTaraf.add(b);
+        }
+        bant.add(sagTaraf, BorderLayout.EAST);
+        return bant;
     }
 
-    private JPanel belgeAlani() {
-        JPanel p = new JPanel(new BorderLayout(6, 6));
-        p.setBorder(BorderFactory.createTitledBorder("Belgeler — PDF / DOCX dosyalarını buraya sürükleyin "
-                + "(birden fazla belge tek forma bağlanır: ayrı belgeler veya aynı işleme ait belgeler)"));
-        belgeListesi.setVisibleRowCount(3);
-        belgeListesi.setCellRenderer((l, v, i, sec, odak) -> {
-            JLabel r = new JLabel((i + 1) + ". " + v.getFileName() + "   (" + v.getParent() + ")");
-            r.setOpaque(true);
-            r.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
-            r.setBackground(sec ? l.getSelectionBackground() : l.getBackground());
-            r.setForeground(sec ? l.getSelectionForeground() : l.getForeground());
-            return r;
-        });
+    /** Adım göstergesi: 1 Belge → 2 Düzenle → 3 Onay ve kayıt. */
+    private void adim(int n) {
+        aktifAdim = n;
+        for (int i = 0; i < 3; i++) {
+            AdimEtiketi a = (AdimEtiketi) adimlar[i];
+            boolean aktif = i + 1 == n, gecti = i + 1 < n;
+            a.setText((gecti ? "✓" : String.valueOf(i + 1)) + "   " + a.getText().replaceFirst("^\\S+\\s+", ""));
+            a.aktif = aktif;
+            a.setForeground(aktif ? Tema.ustBant() : new Color(255, 255, 255, gecti ? 230 : 150));
+            a.repaint();
+        }
+    }
+
+    /** Adım göstergesi etiketi: etkin adım beyaz "hap" içinde. */
+    private static final class AdimEtiketi extends JLabel {
+        boolean aktif;
+
+        AdimEtiketi(String metin) {
+            super(metin);
+            setOpaque(false);
+        }
+
+        @Override protected void paintComponent(java.awt.Graphics g0) {
+            if (aktif) {
+                java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+                g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(Color.WHITE);
+                g.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+                g.dispose();
+            }
+            super.paintComponent(g0);
+        }
+    }
+
+    /** Belge kartı: bırakma alanı, eklenen belgeler, form türü / model ve "Analiz Et". */
+    private JComponent belgeKarti() {
         TransferHandler th = new TransferHandler() {
             @Override public boolean canImport(TransferSupport s) {
-                return s.isDataFlavorSupported(DataFlavor.javaFileListFlavor);
+                boolean ok = s.isDataFlavorSupported(DataFlavor.javaFileListFlavor);
+                if (ok && birakmaAlani != null) birakmaAlani.vurgula(true);
+                return ok;
             }
 
             @Override @SuppressWarnings("unchecked")
             public boolean importData(TransferSupport s) {
+                if (birakmaAlani != null) birakmaAlani.vurgula(false);
                 try {
                     List<File> l = (List<File>) s.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
                     dosyalariEkle(l.stream().map(File::toPath).toList());
@@ -200,31 +264,18 @@ public class AnaPencere extends JFrame {
                 }
             }
         };
-        belgeListesi.setTransferHandler(th);
-        p.setTransferHandler(th);
-        JScrollPane sp = new JScrollPane(belgeListesi);
-        sp.setPreferredSize(new Dimension(600, 80));
-        sp.setTransferHandler(th);
-        p.add(sp, BorderLayout.CENTER);
+        birakmaAlani = new BirakmaAlani(this::belgeSec);
+        birakmaAlani.setTransferHandler(th);
 
-        JButton ekle = new JButton("Dosya Ekle…");
-        ekle.addActionListener(e -> belgeSec());
-        JButton kaldir = new JButton("Kaldır");
-        kaldir.addActionListener(e -> {
-            for (Path x : belgeListesi.getSelectedValuesList()) belgeler.removeElement(x);
+        belgeEtiketleri.setOpaque(false);
+        belgeler.addListDataListener(new javax.swing.event.ListDataListener() {
+            public void intervalAdded(javax.swing.event.ListDataEvent e) { etiketleriYenile(); }
+            public void intervalRemoved(javax.swing.event.ListDataEvent e) { etiketleriYenile(); }
+            public void contentsChanged(javax.swing.event.ListDataEvent e) { etiketleriYenile(); }
         });
-        JButton temizle = new JButton("Temizle");
-        temizle.addActionListener(e -> belgeler.clear());
 
-        formTuruTercihi.addItem("Form türü: otomatik öner");
+        formTuruTercihi.addItem("Form türü: otomatik");
         y.ayarlar().formTurleri().forEach(f -> formTuruTercihi.addItem(f.kod()));
-        analizEt.addActionListener(e -> analizEt());
-
-        JPanel btn = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        btn.add(ekle);
-        btn.add(kaldir);
-        btn.add(temizle);
-        btn.add(formTuruTercihi);
         y.ayarlar().modeller().forEach(modelSecici::addItem);
         String kayitli = tercihler.model(y.ayarlar().model());
         for (int i = 0; i < modelSecici.getItemCount(); i++) {
@@ -236,48 +287,212 @@ public class AnaPencere extends JFrame {
                 tercihler.modelAyarla(ms.id());
             }
         });
-        btn.add(new JLabel("Model:"));
-        btn.add(modelSecici);
-        btn.add(analizEt);
-        p.add(btn, BorderLayout.SOUTH);
-        return p;
+        analizEt.addActionListener(e -> analizEt());
+        analizIlerleme.setIndeterminate(true);
+        analizIlerleme.setVisible(false);
+        analizIlerleme.setPreferredSize(new Dimension(120, 6));
+
+        JPanel kontroller = new JPanel(new java.awt.GridBagLayout());
+        kontroller.setOpaque(false);
+        java.awt.GridBagConstraints c = new java.awt.GridBagConstraints();
+        c.insets = new java.awt.Insets(0, 0, 0, 8);
+        c.anchor = java.awt.GridBagConstraints.WEST;
+        kontroller.add(formTuruTercihi, c);
+        kontroller.add(modelSecici, c);
+        c.weightx = 1;
+        c.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        c.insets = new java.awt.Insets(0, 8, 0, 12);
+        kontroller.add(analizIlerleme, c);
+        c.weightx = 0;
+        c.fill = java.awt.GridBagConstraints.NONE;
+        c.insets = new java.awt.Insets(0, 0, 0, 0);
+        kontroller.add(analizEt, c);
+
+        JPanel govde = new JPanel(new BorderLayout(0, 10));
+        govde.setOpaque(false);
+        govde.add(birakmaAlani, BorderLayout.NORTH);
+        govde.add(belgeEtiketleri, BorderLayout.CENTER);
+        govde.add(kontroller, BorderLayout.SOUTH);
+
+        JButton temizle = new JButton("Temizle");
+        temizle.putClientProperty(com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE,
+                com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE_BORDERLESS);
+        temizle.addActionListener(e -> belgeler.clear());
+        Kart k = new Kart("Belgeler", "belge", govde)
+                .aciklama("Birden fazla belge tek forma bağlanır: ayrı belgeler veya aynı işleme ait belgeler.")
+                .sag(temizle);
+        k.setTransferHandler(th);
+        etiketleriYenile();
+        return k;
+    }
+
+    /** Eklenen belgeleri kaldırılabilir "etiket"ler olarak gösterir. */
+    private void etiketleriYenile() {
+        belgeEtiketleri.removeAll();
+        for (int i = 0; i < belgeler.size(); i++) {
+            Path p = belgeler.get(i);
+            JPanel etiket = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+            etiket.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE, "arc:999");
+            etiket.setBackground(Tema.koyu() ? new Color(0x33405A) : new Color(0xE8EEF8));
+            etiket.setBorder(BorderFactory.createEmptyBorder(1, 6, 1, 2));
+            String ad = p.getFileName().toString();
+            JLabel l = new JLabel(ad.length() > 46 ? ad.substring(0, 43) + "…" : ad,
+                    Simgeler.vurgu(ad.toLowerCase().endsWith(".pdf") ? "pdf" : "word", 16), JLabel.LEFT);
+            l.setToolTipText(p.toString());
+            JButton x = new JButton(Simgeler.al("kapat", 12));
+            x.putClientProperty(com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE,
+                    com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+            x.setToolTipText("Kaldır");
+            x.addActionListener(e -> belgeler.removeElement(p));
+            etiket.add(l);
+            etiket.add(x);
+            belgeEtiketleri.add(etiket);
+        }
+        belgeEtiketleri.setVisible(!belgeler.isEmpty());
+        if (birakmaAlani != null) birakmaAlani.kucuk(!belgeler.isEmpty());
+        analizEt.setEnabled(!belgeler.isEmpty() && !analizIlerleme.isVisible());
+        belgeEtiketleri.revalidate();
+        belgeEtiketleri.repaint();
+    }
+
+    /** Alt eylem çubuğu: durum mesajı + Doğrula / Word / PDF. */
+    private JPanel eylemCubugu() {
+        JPanel alt = new JPanel(new BorderLayout(12, 0)) {
+            @Override protected void paintComponent(java.awt.Graphics g) {
+                g.setColor(Tema.kart());
+                g.fillRect(0, 0, getWidth(), getHeight());
+                g.setColor(Tema.kartKenar());
+                g.drawLine(0, 0, getWidth(), 0);
+            }
+        };
+        alt.setBorder(BorderFactory.createEmptyBorder(10, 18, 10, 16));
+        durum.setForeground(Tema.ikincilYazi());
+        alt.add(durum, BorderLayout.CENTER);
+        dogrula.addActionListener(e -> canliDogrula());
+        dogrula.putClientProperty(com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE,
+                com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE_BORDERLESS);
+        JPanel btn = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        btn.setOpaque(false);
+        btn.add(dogrula);
+        btn.add(wordOlustur);
+        btn.add(pdfOlusturBtn);
+        alt.add(btn, BorderLayout.EAST);
+        return alt;
+    }
+
+    /** Temaya bağlı renk ve simgeleri (yeniden) uygular. */
+    private void stilleriUygula() {
+        String v = String.format("#%06X", Tema.vurgu().getRGB() & 0xFFFFFF);
+        for (JButton b : new JButton[]{analizEt, pdfOlusturBtn}) {
+            b.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE,
+                    "background:" + v + ";foreground:#FFFFFF;borderWidth:0;focusWidth:0;font:bold;"
+                            + "hoverBackground:darken(" + v + ",6%);pressedBackground:darken(" + v + ",12%);"
+                            + "disabledBackground:lighten(" + v + ",35%);disabledText:#FFFFFFCC;margin:7,16,7,16");
+        }
+        analizEt.setText("Analiz Et");
+        analizEt.setIcon(Simgeler.al("analiz", 16, Color.WHITE));
+        pdfOlusturBtn.setText("PDF oluştur");
+        pdfOlusturBtn.setIcon(Simgeler.al("pdf", 16, Color.WHITE));
+        wordOlustur.setText("Word olarak kaydet");
+        wordOlustur.setIcon(Simgeler.al("word", 16));
+        dogrula.setIcon(Simgeler.al("onay", 16));
+        temaDugmesi.setIcon(Simgeler.al(Tema.koyu() ? "gunes" : "ay", 18, Color.WHITE));
+        durum.setIcon(Simgeler.al("bilgi", 15));
+        durum.setForeground(Tema.ikincilYazi());
+        getRootPane().putClientProperty("JRootPane.titleBarBackground", Tema.ustBant());
+        adim(aktifAdim);
+        etiketleriYenile();
+        repaint();
+    }
+
+    /** Eski menü çubuğunun içeriği, üst banttaki ☰ düğmesinden açılır. */
+    private javax.swing.JPopupMenu menu() {
+        javax.swing.JPopupMenu m = new javax.swing.JPopupMenu();
+        JMenuItem ekle = new JMenuItem("Belge ekle…", Simgeler.al("yukle", 16));
+        ekle.addActionListener(e -> belgeSec());
+        JMenuItem bos = new JMenuItem("Yeni boş form", Simgeler.al("arti", 16));
+        bos.addActionListener(e -> bosForm());
+        JMenuItem wordMenu = new JMenuItem("Word olarak oluştur…", Simgeler.al("word", 16));
+        wordMenu.addActionListener(e -> olustur(false));
+        JMenuItem pdfMenu = new JMenuItem("PDF olarak oluştur…", Simgeler.al("pdf", 16));
+        pdfMenu.addActionListener(e -> olustur(true));
+        JMenuItem gunluk = new JMenuItem("İşlem günlüğünü aç");
+        gunluk.addActionListener(e -> ac(IslemGunlugu.varsayilan().dosya()));
+        JMenuItem anahtar = new JMenuItem("API anahtarı…");
+        anahtar.addActionListener(e -> anahtarGir());
+        JMenuItem yenile = new JMenuItem("Yapılandırmayı yeniden yükle");
+        yenile.addActionListener(e -> yapilandirmayiYenile());
+        JMenuItem klasor = new JMenuItem("Uygulama klasörünü aç");
+        klasor.addActionListener(e -> ac(UygulamaYolu.kok()));
+        JMenuItem hakkinda = new JMenuItem("Hakkında", Simgeler.al("bilgi", 16));
+        hakkinda.addActionListener(e -> JOptionPane.showMessageDialog(this,
+                "YÖBF Otomatörü\nYönetici Özet Bilgilendirme Formu hazırlama aracı.\n\n"
+                        + "Model: " + y.ayarlar().model() + "\nUygulama klasörü: " + UygulamaYolu.kok()
+                        + "\nAPI anahtarı dosyası: " + ApiAnahtari.dosya(),
+                "Hakkında", JOptionPane.INFORMATION_MESSAGE));
+        JMenuItem cik = new JMenuItem("Çıkış");
+        cik.addActionListener(e -> dispose());
+        m.add(ekle);
+        m.add(bos);
+        m.addSeparator();
+        m.add(wordMenu);
+        m.add(pdfMenu);
+        m.addSeparator();
+        m.add(anahtar);
+        m.add(yenile);
+        m.add(klasor);
+        m.add(gunluk);
+        m.addSeparator();
+        m.add(hakkinda);
+        m.add(cik);
+        return m;
     }
 
     private JPanel yanPanel() {
         JList<Uyari> ul = new JList<>(uyarilar);
         ul.setCellRenderer((l, v, i, sec, odak) -> {
-            JLabel r = new JLabel("<html><b>" + v.alan() + ":</b> " + v.mesaj() + "</html>");
+            JLabel r = new JLabel("<html><b>" + v.alan() + ":</b> " + v.mesaj() + "</html>",
+                    Simgeler.al("uyari", 15, v.seviye() == Uyari.Seviye.KIRMIZI ? new Color(0xC62828) : new Color(0xB26A00)), JLabel.LEFT);
             r.setOpaque(true);
-            r.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
-            r.setForeground(Color.BLACK);
-            r.setBackground(v.seviye() == Uyari.Seviye.KIRMIZI ? new Color(0xFFCDD2) : new Color(0xFFF59D));
+            r.setIconTextGap(8);
+            r.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createEmptyBorder(3, 0, 3, 0),
+                    BorderFactory.createEmptyBorder(6, 8, 6, 8)));
+            r.setForeground(new Color(0x1F2937));
+            r.setBackground(v.seviye() == Uyari.Seviye.KIRMIZI ? new Color(0xFDECEC) : new Color(0xFFF6DB));
             return r;
         });
         JScrollPane us = new JScrollPane(ul);
-        us.setBorder(BorderFactory.createTitledBorder("Doğrulama uyarıları"));
+        us.setBorder(BorderFactory.createEmptyBorder());
 
         JList<String> dl = new JList<>(dikkat);
         dl.setCellRenderer((l, v, i, sec, odak) -> {
-            JLabel r = new JLabel("<html><div style='width:260px'>• " + v + "</div></html>");
-            r.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
+            JLabel r = new JLabel("<html><div style='width:300px'>" + v + "</div></html>", Simgeler.vurgu("fikir", 15), JLabel.LEFT);
+            r.setIconTextGap(8);
+            r.setVerticalTextPosition(JLabel.TOP);
+            r.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
             return r;
         });
         JScrollPane ds = new JScrollPane(dl);
-        ds.setBorder(BorderFactory.createTitledBorder("Dikkat edilmesi önerilen hususlar (forma yazılmaz)"));
+        ds.setBorder(BorderFactory.createEmptyBorder());
 
         onizleme = new OnizlemePaneli(y.ayarlar());
+        onizleme.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
         onizleme.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mouseClicked(java.awt.event.MouseEvent e) { buyukOnizleme(); }
         });
-        JPanel onizlemeSekmesi = new JPanel(new BorderLayout());
+        JPanel onizlemeSekmesi = new JPanel(new BorderLayout(0, 6));
         onizlemeSekmesi.add(onizleme, BorderLayout.CENTER);
-        onizlemeSekmesi.add(new JLabel("<html><small>Yaklaşık görünüm — kesin hali Word çıktısındadır. "
-                + "Büyütmek için tıklayın.</small></html>"), BorderLayout.SOUTH);
+        JLabel not = new JLabel("Yaklaşık görünüm — kesin hali Word çıktısındadır. Büyütmek için tıklayın.");
+        not.setForeground(Tema.ikincilYazi());
+        not.setFont(not.getFont().deriveFont(11.5f));
+        onizlemeSekmesi.add(not, BorderLayout.SOUTH);
 
         javax.swing.JTabbedPane sekmeler = new javax.swing.JTabbedPane();
-        sekmeler.addTab("Önizleme", onizlemeSekmesi);
-        sekmeler.addTab("Uyarılar", us);
-        sekmeler.addTab("Dikkat hususları", ds);
+        sekmeler.addTab("Önizleme", Simgeler.al("goz", 16), onizlemeSekmesi);
+        sekmeler.addTab("Uyarılar", Simgeler.al("uyari", 16), us);
+        sekmeler.addTab("Dikkat hususları", Simgeler.al("fikir", 16), ds);
+        sekmeler.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE,
+                "tabAreaAlignment:leading;tabInsets:4,10,4,10;contentSeparatorHeight:1");
         uyarilar.addListDataListener(new javax.swing.event.ListDataListener() {
             void say() { sekmeler.setTitleAt(1, uyarilar.isEmpty() ? "Uyarılar" : "Uyarılar (" + uyarilar.size() + ")"); }
             public void intervalAdded(javax.swing.event.ListDataEvent e) { say(); }
@@ -290,11 +505,10 @@ public class AnaPencere extends JFrame {
             public void intervalRemoved(javax.swing.event.ListDataEvent e) { say(); }
             public void contentsChanged(javax.swing.event.ListDataEvent e) { say(); }
         });
-        JPanel p = new JPanel(new BorderLayout());
-        p.add(sekmeler, BorderLayout.CENTER);
-        p.setPreferredSize(new Dimension(400, 400));
+        Kart k = new Kart("Önizleme ve kontrol", "goz", sekmeler);
+        k.setPreferredSize(new Dimension(440, 400));
         onizlemeZamanlayici.setRepeats(false);
-        return p;
+        return k;
     }
 
     // ---------------------------------------------------------------- işlemler
@@ -351,6 +565,7 @@ public class AnaPencere extends JFrame {
                 ? ms.id() : y.ayarlar().model();
 
         analizEt.setEnabled(false);
+        analizIlerleme.setVisible(true);
         ciktiDugmeleri(false);
         new SwingWorker<Object[], String>() {
             @Override protected Object[] doInBackground() throws Exception {
@@ -384,7 +599,8 @@ public class AnaPencere extends JFrame {
             }
 
             @Override protected void done() {
-                analizEt.setEnabled(true);
+                analizIlerleme.setVisible(false);
+                analizEt.setEnabled(!belgeler.isEmpty());
                 ciktiDugmeleri(true);
                 try {
                     Object[] r = get();
@@ -412,6 +628,7 @@ public class AnaPencere extends JFrame {
                     panel.yukle(f);
                     dikkat.clear();
                     o.dikkatHususlari().stream().filter(s -> s != null && !s.isBlank()).forEach(dikkat::addElement);
+                    adim(2);
                     durum("Analiz tamamlandı. Güven — taraflar: " + yuzde(o.guven().taraflar())
                             + ", bedel: " + yuzde(o.guven().bedel()) + ". Alanları kontrol edip onaylayın.");
                     canliDogrula();
@@ -512,6 +729,7 @@ public class AnaPencere extends JFrame {
                 JOptionPane.YES_NO_OPTION, kirmizi > 0 ? JOptionPane.WARNING_MESSAGE : JOptionPane.QUESTION_MESSAGE);
         if (onay != JOptionPane.YES_OPTION) return;
         boolean ek = ekKutu.isSelected();
+        adim(3);
         if (pdf) tercihler.wordDeSaklaAyarla(ek);
         else tercihler.pdfDeOlusturAyarla(ek);
 

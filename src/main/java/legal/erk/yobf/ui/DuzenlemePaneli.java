@@ -100,6 +100,10 @@ public class DuzenlemePaneli extends JPanel {
     private final Map<JComponent, Object[]> ilkRenk = new HashMap<>();
     private Runnable degisti = () -> {};
     private boolean yukleniyor;
+    /** satir() bileşenleri bu kart gövdesine ekler. */
+    private JPanel hedef;
+    private int hedefSatir;
+    private int kartSirasi;
 
     public DuzenlemePaneli(Yapilandirma y) {
         super(new GridBagLayout());
@@ -123,11 +127,17 @@ public class DuzenlemePaneli extends JPanel {
         grupBasligi.setSelectedItem(a.cokluBelge().baslikBicimi());
 
         int r = 0;
+        setOpaque(false);
+        JPanel genel = yeniKartGovdesi();
         r = satir(r, "Form türü", formTuru, null);
         r = satir(r, "Tarih (GG.AA.YYYY)", tarih, Satirlar.TARIH);
         r = satir(r, "Belge Türü", belgeTuru, Satirlar.BELGE_TURU);
         r = satir(r, "Talep Eden Departman", talepEden, Satirlar.TALEP_EDEN);
         r = satir(r, "İmzaya Sunan Departman", imzayaSunan, Satirlar.IMZAYA_SUNAN);
+        kartEkle(new Kart("Genel bilgiler", "bilgi", genel)
+                .aciklama("Etiketin yanındaki kutucuk işaretliyse o satır forma dahil edilir."));
+
+        JPanel icerik = yeniKartGovdesi();
 
         r = satir(r, "<html>Taraflar<br><small>her satıra bir taraf;<br>birden fazla belgede<br>gruplar arası \"---\"</small></html>",
                 tarafPaneli(), Satirlar.TARAFLAR, yobfAlanlari);
@@ -148,6 +158,9 @@ public class DuzenlemePaneli extends JPanel {
         konuPanel.add(sayacPanel, BorderLayout.SOUTH);
         r = satir(r, "Konu", konuPanel, Satirlar.KONU);
         r = satir(r, "Konu (EN)", kaydir(konuEn), null, enAlanlari);
+        kartEkle(new Kart("Taraflar, konu ve bedel", "belge", icerik));
+
+        JPanel notKarti = yeniKartGovdesi();
 
         JPanel notPanel = new JPanel(new BorderLayout(4, 4));
         notPanel.add(notEtiketi, BorderLayout.NORTH);
@@ -159,6 +172,10 @@ public class DuzenlemePaneli extends JPanel {
         yetkiliPanel.add(kaydir(imzasinaSunulacak), BorderLayout.CENTER);
         r = satir(r, "<html>İmzasına Sunulacak<br>Yetkili <small>(opsiyonel)</small><br>"
                 + "<small>ör. Sn. Ad SOYAD (X için)</small></html>", yetkiliPanel, Satirlar.IMZASINA_SUNULACAK);
+        kartEkle(new Kart("Not ve imzasına sunulacak yetkili", "fikir", notKarti)
+                .aciklama("Not alanını hukukçu yazar; model doldurmaz."));
+
+        JPanel logoKarti = yeniKartGovdesi();
 
         JPanel logoPanel = new JPanel(new BorderLayout(4, 4));
         logoPanel.add(logo, BorderLayout.NORTH);
@@ -167,29 +184,21 @@ public class DuzenlemePaneli extends JPanel {
         logoOnizleme.setIconTextGap(12);
         logoPanel.add(logoOnizleme, BorderLayout.CENTER);
         r = satir(r, "<html>Logo<br><small>elle seçilebilir</small></html>", logoPanel, null);
+        kartEkle(new Kart("Logo", "goz", logoKarti));
 
-        GridBagConstraints ek = new GridBagConstraints();
-        ek.gridx = 0;
-        ek.gridy = r++;
-        ek.gridwidth = 2;
-        ek.fill = GridBagConstraints.HORIZONTAL;
-        ek.weightx = 1;
-        ek.insets = new Insets(8, 4, 4, 4);
-        add(ekSatirlar, ek);
-
-        GridBagConstraints c = new GridBagConstraints();
-        c.gridx = 0;
-        c.gridy = r;
-        c.gridwidth = 2;
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.weightx = 1;
-        c.insets = new Insets(8, 4, 4, 4);
-        add(imzaciPaneli, c);
+        kartEkle(new Kart("Eklenen satırlar", "arti", ekSatirlar)
+                .aciklama("Formda olmayan bir bilgi için yeni satır veya bir satırın içine alt satır ekleyin."));
+        kartEkle(new Kart("İmzacılar", "onay", imzaciPaneli)
+                .aciklama("UYGUNDUR bloğu: 1–5 imzacı (sürükleyerek sıralayın) ve isteğe bağlı ek onay."));
         alanBilesenleri.put("İmzacılar", List.of(imzaciPaneli.listeBileseni()));
         alanBilesenleri.put("Ek Onay", List.of(imzaciPaneli.listeBileseni()));
-        c.gridy = r + 1;
-        c.weighty = 1;
-        add(new JPanel(), c);
+        GridBagConstraints son = new GridBagConstraints();
+        son.gridy = kartSirasi;
+        son.weighty = 1;
+        son.fill = GridBagConstraints.BOTH;
+        JPanel bosluk = new JPanel();
+        bosluk.setOpaque(false);
+        add(bosluk, son);
 
         alanBilesenleri.put("Tarih", List.of(tarih));
         alanBilesenleri.put("Belge Türü", List.of(belgeTuru));
@@ -209,6 +218,23 @@ public class DuzenlemePaneli extends JPanel {
         cokluPanelDurumu();
         formTuruDegisti();
         konuSay();
+    }
+
+    /** Yeni kart gövdesi açar; sonraki satir() çağrıları buraya eklenir. */
+    private JPanel yeniKartGovdesi() {
+        hedef = new JPanel(new GridBagLayout());
+        hedef.setOpaque(false);
+        hedefSatir = 0;
+        return hedef;
+    }
+
+    private void kartEkle(Kart k) {
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridy = kartSirasi++;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.weightx = 1;
+        c.insets = new Insets(kartSirasi == 1 ? 0 : 12, 0, 0, 0);
+        add(k, c);
     }
 
     /** Taraflar alanı + birden fazla belge seçenekleri (ilişki, grup türleri, başlık biçimi). */
@@ -343,7 +369,7 @@ public class DuzenlemePaneli extends JPanel {
     /** anahtar null değilse satır etiketi "forma dahil et" kutucuğudur. */
     private int satir(int r, String etiket, JComponent bilesen, String anahtar, List<JComponent> grup) {
         GridBagConstraints c = new GridBagConstraints();
-        c.gridy = r;
+        c.gridy = hedefSatir;
         c.insets = new Insets(4, 4, 4, 8);
         c.anchor = GridBagConstraints.NORTHWEST;
         JComponent l;
@@ -360,16 +386,17 @@ public class DuzenlemePaneli extends JPanel {
         } else {
             l = new JLabel(etiket);
         }
-        add(l, c);
+        hedef.add(l, c);
         c.gridx = 1;
         c.weightx = 1;
         c.fill = GridBagConstraints.HORIZONTAL;
         c.insets = new Insets(4, 0, 4, 4);
-        add(bilesen, c);
+        hedef.add(bilesen, c);
         if (grup != null) {
             grup.add(l);
             grup.add(bilesen);
         }
+        hedefSatir++;
         return r + 1;
     }
 

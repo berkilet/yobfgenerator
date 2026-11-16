@@ -55,9 +55,15 @@ public class OnizlemePaneli extends JPanel {
     public OnizlemePaneli(Ayarlar ayarlar) {
         this.ayarlar = ayarlar;
         this.yazici = new FormYazici(ayarlar);
-        setBackground(new Color(0x9E9E9E));
+        setBackground(Tema.koyu() ? new Color(0x15171A) : new Color(0xE6EAF1));
         setPreferredSize(new Dimension(360, 510));
         setToolTipText("Yaklaşık önizleme — kesin görünüm Word çıktısındadır. Büyütmek için tıklayın.");
+    }
+
+    @Override
+    public void updateUI() {
+        super.updateUI();
+        setBackground(Tema.koyu() ? new Color(0x15171A) : new Color(0xE6EAF1));
     }
 
     public void goster(FormVerisi f) {
