@@ -19,6 +19,9 @@ import java.awt.Insets;
 /** Yuvarlak köşeli, başlıklı içerik kartı. İçindeki ara paneller şeffaf yapılır. */
 public class Kart extends JPanel {
 
+    /** Bu özellik true olan paneller kendi zemin rengini korur (şeffaf yapılmaz). */
+    public static final String OPAK = "yobf.opak";
+
     private final JLabel baslik = new JLabel();
     private final JLabel aciklama = new JLabel();
     private final JPanel ust = new JPanel(new BorderLayout(10, 0));
@@ -75,7 +78,8 @@ public class Kart extends JPanel {
     /** Kartın içindeki düz panelleri şeffaf yapar (kart rengi görünsün). */
     static void seffaf(Component c) {
         if (c instanceof JScrollPane || c instanceof JViewport) return;
-        if (c instanceof JPanel p && !(c instanceof Kart) && !(c instanceof OnizlemePaneli)) {
+        if (c instanceof JPanel p && !(c instanceof Kart) && !(c instanceof OnizlemePaneli)
+                && !Boolean.TRUE.equals(p.getClientProperty(OPAK))) {
             p.setOpaque(false);
             if (p.getBorder() instanceof javax.swing.border.TitledBorder) p.setBorder(BorderFactory.createEmptyBorder());
         }

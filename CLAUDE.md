@@ -12,7 +12,7 @@ Referans formlar: `ornekler/` klasöründeki üç PDF (toplam 14 form). Üretile
 |---|---|---|
 | Dil / JDK | Java 21 (LTS) | |
 | Derleme | Maven | |
-| Arayüz | Swing + FlatLaf | jlink ile küçük imaj, ek runtime yok |
+| Arayüz | Swing + FlatLaf (+ `flatlaf-extras` SVG simgeler, `flatlaf-fonts-inter`) | jlink ile küçük imaj, ek runtime yok. Modern tasarım: lacivert üst bant + adım göstergesi, kart tabanlı düzen (`ui/Kart`), açık/koyu tema (`ui/Tema`), `JOptionPane` yerine `ui/Diyalog`, kısa mesajlar için `ui/Bildirim` |
 | PDF okuma | Apache PDFBox 3.x | Metin katmanı yoksa kullanıcıya "taranmış belge" uyarısı ver (OCR v1'de kapsam dışı) |
 | Word okuma/yazma | Apache POI 5.x (XWPF) | .docx girdi + çıktı |
 | Yapay zekâ | Anthropic resmi Java SDK (`com.anthropic:anthropic-java`) | Model adı `config/ayarlar.json` içinden okunur, koda gömülmez. Varsayılan `claude-haiku-5-5` (ekonomik); `modeller` listesindekiler arayüzden seçilir. Sunucu tarafı yedek model (`fallbacks`) yalnızca `yedek_model: true` olan modellerde gönderilir (Haiku 5.5 desteklemez). |

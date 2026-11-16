@@ -39,9 +39,7 @@ public class EkSatirlarPaneli extends JPanel {
 
     private final JPanel liste = new JPanel();
     private final List<Oge> ogeler = new ArrayList<>();
-    private final JLabel bosBilgi = new JLabel("<html><small>Henüz eklenen satır yok. Formda olmayan bir bilgi için "
-            + "<b>Satır ekle</b> (yeni etiket/değer satırı) veya bir satırın içine bilgi eklemek için "
-            + "<b>Alt satır ekle</b> kullanın.</small></html>");
+    private final JLabel bosBilgi = new JLabel("Henüz eklenen satır yok.");
     private String formTuru = "YOBF";
     private Runnable degisti = () -> {};
 
@@ -51,16 +49,17 @@ public class EkSatirlarPaneli extends JPanel {
         liste.setLayout(new BoxLayout(liste, BoxLayout.Y_AXIS));
         add(liste, BorderLayout.CENTER);
 
-        JButton satirEkle = new JButton("+ Satır ekle");
+        JButton satirEkle = new JButton("Satır ekle", Simgeler.al("arti", 14));
         satirEkle.setToolTipText("Tabloya, seçeceğiniz satırdan sonra yeni bir \"Etiket : Değer\" satırı ekler");
         satirEkle.addActionListener(e -> ekle(new EkSatir(false, Satirlar.IMZASINA_SUNULACAK, "", "")));
-        JButton altEkle = new JButton("+ Alt satır ekle");
+        JButton altEkle = new JButton("Alt satır ekle", Simgeler.al("arti", 14));
         altEkle.setToolTipText("Seçeceğiniz satırın içine (ör. Belgenin Konusu/Özeti) \"Etiket: değer\" şeklinde alt satır ekler");
         altEkle.addActionListener(e -> ekle(new EkSatir(true, Satirlar.KONU, "", "")));
         JPanel btn = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         btn.add(satirEkle);
         btn.add(altEkle);
         add(btn, BorderLayout.SOUTH);
+        bosBilgi.setForeground(Tema.ikincilYazi());
         yenile();
     }
 
@@ -135,7 +134,10 @@ public class EkSatirlarPaneli extends JPanel {
             c.gridx = 2;
             c.weightx = 0;
             c.fill = GridBagConstraints.NONE;
-            JButton sil = new JButton("Sil");
+            JButton sil = new JButton(Simgeler.al("kapat", 14));
+            sil.setToolTipText("Bu satırı sil");
+            sil.putClientProperty(com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE,
+                    com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
             sil.addActionListener(ev -> {
                 ogeler.remove(this);
                 yenile();

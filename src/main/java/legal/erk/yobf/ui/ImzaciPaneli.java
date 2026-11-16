@@ -15,7 +15,6 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
@@ -62,28 +61,25 @@ public class ImzaciPaneli extends JPanel {
         liste.setDragEnabled(true);
         liste.setDropMode(DropMode.INSERT);
         liste.setTransferHandler(new SiralamaAktarici());
-        liste.setCellRenderer((l, v, i, sec, odak) -> {
-            JLabel r = new JLabel((i + 1) + ". " + v.ad() + (v.unvan().isBlank() ? "" : "  —  " + v.unvan()));
-            r.setOpaque(true);
-            r.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
-            r.setBackground(sec ? l.getSelectionBackground() : l.getBackground());
-            r.setForeground(sec ? l.getSelectionForeground() : l.getForeground());
-            return r;
-        });
+        liste.setCellRenderer((l, v, i, sec, odak) -> new ImzaciSatiri(i + 1, v, sec));
+        liste.setFixedCellHeight(52);
 
-        JButton ekle = new JButton("Ekle");
+        JButton ekle = new JButton("Ekle", Simgeler.al("arti", 14));
         ekle.addActionListener(e -> ekle((Imzaci) secici.getSelectedItem()));
-        JButton elle = new JButton("Elle Ekle…");
+        JButton elle = new JButton("Elle ekle…");
         elle.setToolTipText("Listede olmayan bir kişiyi ekle");
         elle.addActionListener(e -> elleGir().ifPresent(this::ekle));
-        JButton kaldir = new JButton("Kaldır");
+        JButton kaldir = new JButton(Simgeler.al("kapat", 14));
+        kaldir.setToolTipText("Seçili imzacıyı kaldır");
         kaldir.addActionListener(e -> {
             int i = liste.getSelectedIndex();
             if (i >= 0) { model.remove(i); guncelle(); }
         });
-        JButton yukari = new JButton("▲");
+        JButton yukari = new JButton("↑");
+        yukari.setToolTipText("Yukarı taşı (sürükleyerek de sıralayabilirsiniz)");
         yukari.addActionListener(e -> tasi(-1));
-        JButton asagi = new JButton("▼");
+        JButton asagi = new JButton("↓");
+        asagi.setToolTipText("Aşağı taşı");
         asagi.addActionListener(e -> tasi(1));
 
         JPanel ust = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
@@ -93,7 +89,11 @@ public class ImzaciPaneli extends JPanel {
         add(ust, BorderLayout.NORTH);
 
         JScrollPane sp = new JScrollPane(liste);
-        sp.setPreferredSize(new Dimension(420, 130));
+        sp.setPreferredSize(new Dimension(420, 176));
+        for (JButton b : new JButton[]{yukari, asagi, kaldir}) {
+            b.putClientProperty(com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE,
+                    com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE_TOOLBAR_BUTTON);
+        }
         add(sp, BorderLayout.CENTER);
 
         JPanel sag = new JPanel(new GridLayout(0, 1, 4, 4));
@@ -105,9 +105,12 @@ public class ImzaciPaneli extends JPanel {
         add(sagDis, BorderLayout.EAST);
 
         ekOnayBaslik.setText(ib.ekOnayBaslik());
-        ekOnayBaslik.setColumns(10);
+
         ekOnay.setSelected(ib.ekOnayAcikVarsayilan());
         JButton ekOnayElleBtn = new JButton("Elle…");
+        ekOnaySecici.setPreferredSize(new Dimension(250, ekOnaySecici.getPreferredSize().height));
+        ekOnayBaslik.setColumns(7);
+        sayac.setForeground(Tema.ikincilYazi());
         ekOnayElleBtn.addActionListener(e -> elleGir().ifPresent(i -> {
             ekOnayElle = i;
             ekOnaySecici.addItem(i);
@@ -145,8 +148,8 @@ public class ImzaciPaneli extends JPanel {
     private void ekle(Imzaci i) {
         if (i == null) return;
         if (model.size() >= ib.anaImzaciMax()) {
-            JOptionPane.showMessageDialog(this, "En fazla " + ib.anaImzaciMax() + " ana imzacı eklenebilir.\n"
-                    + "Ek bir onay için alttaki \"Ek onay bloğu\"nu kullanın.", "İmzacılar", JOptionPane.WARNING_MESSAGE);
+            Diyalog.bilgi(this, Diyalog.Tur.UYARI, "En fazla " + ib.anaImzaciMax() + " ana imzacı",
+                    "Ek bir onay için alttaki <b>Ek onay bloğu</b>nu kullanın.");
             return;
         }
         for (int k = 0; k < model.size(); k++) {
@@ -185,11 +188,63 @@ public class ImzaciPaneli extends JPanel {
         p.add(unvan);
         p.add(new JLabel("Unvan (EN):"));
         p.add(unvanEn);
-        int r = JOptionPane.showConfirmDialog(this, p, "İmzacı ekle", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (r != JOptionPane.OK_OPTION || ad.getText().isBlank()) return java.util.Optional.empty();
+        if (!Diyalog.onayla(this, Diyalog.Tur.BILGI, "İmzacı ekle", "Listede olmayan kişiyi girin. "
+                + "Listede kayıtlı biriyse unvanı imzacilar.json'dan alınır.", p, "Vazgeç", "Ekle")
+                || ad.getText().isBlank()) {
+            return java.util.Optional.empty();
+        }
         // Listedeki bir kişiyse kanonik unvan kullanılır
         return java.util.Optional.of(kayitlar.adaGoreBul(ad.getText())
                 .orElse(new Imzaci("", ad.getText().trim(), unvan.getText().trim(), unvanEn.getText().trim())));
+    }
+
+    /** Liste satırı: sıra rozeti, baş harfler yuvarlağı, ad (kalın) ve unvan. */
+    private static final class ImzaciSatiri extends JPanel {
+        ImzaciSatiri(int sira, Imzaci v, boolean secili) {
+            super(new BorderLayout(10, 0));
+            setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 10));
+            setOpaque(true);
+            java.awt.Color vurgu = Tema.vurgu();
+            setBackground(secili ? new java.awt.Color(vurgu.getRed(), vurgu.getGreen(), vurgu.getBlue(), 38) : Tema.kart());
+            String bh = basHarfler(v.ad());
+            JLabel avatar = new JLabel(bh, JLabel.CENTER) {
+                @Override protected void paintComponent(java.awt.Graphics g0) {
+                    java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+                    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                    g.setColor(vurgu);
+                    g.fillOval(0, 0, getWidth() - 1, getHeight() - 1);
+                    g.dispose();
+                    super.paintComponent(g0);
+                }
+            };
+            avatar.setForeground(java.awt.Color.WHITE);
+            avatar.setFont(avatar.getFont().deriveFont(java.awt.Font.BOLD, 12f));
+            avatar.setPreferredSize(new Dimension(34, 34));
+            JLabel no = new JLabel(String.valueOf(sira));
+            no.setForeground(Tema.ikincilYazi());
+            no.setPreferredSize(new Dimension(14, 34));
+            JPanel sol = new JPanel(new BorderLayout(8, 0));
+            sol.setOpaque(false);
+            sol.add(no, BorderLayout.WEST);
+            sol.add(avatar, BorderLayout.CENTER);
+            add(sol, BorderLayout.WEST);
+            JPanel yazi = new JPanel(new java.awt.GridLayout(2, 1));
+            yazi.setOpaque(false);
+            JLabel ad = new JLabel(v.ad());
+            ad.setFont(ad.getFont().deriveFont(java.awt.Font.BOLD));
+            JLabel unvan = new JLabel(v.unvan().isBlank() ? "(unvan yok)" : v.unvan());
+            unvan.setForeground(Tema.ikincilYazi());
+            yazi.add(ad);
+            yazi.add(unvan);
+            add(yazi, BorderLayout.CENTER);
+        }
+
+        static String basHarfler(String ad) {
+            String[] p = ad.replaceAll("^(Av\\.|Dr\\.|Prof\\.|Sn\\.)\\s*", "").trim().split("\\s+");
+            if (p.length == 0 || p[0].isEmpty()) return "?";
+            String s = p[0].substring(0, 1) + (p.length > 1 ? p[p.length - 1].substring(0, 1) : "");
+            return s.toUpperCase(java.util.Locale.forLanguageTag("tr-TR"));
+        }
     }
 
     // ---------------------------------------------------------------- veri

@@ -59,6 +59,23 @@ public final class Tema {
         FlatAnimatedLafChange.hideSnapshotWithAnimation();
     }
 
+    /** Birincil (dolu, vurgu renkli) düğme biçimi. */
+    public static void birincil(javax.swing.JButton b) {
+        String v = String.format("#%06X", vurgu().getRGB() & 0xFFFFFF);
+        b.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE,
+                "background:" + v + ";foreground:#FFFFFF;borderWidth:0;focusWidth:0;font:bold;"
+                        + "hoverBackground:darken(" + v + ",6%);pressedBackground:darken(" + v + ",12%);"
+                        + "disabledBackground:lighten(" + v + ",35%);disabledText:#FFFFFFCC;margin:7,16,7,16");
+    }
+
+    /** Kenarlıksız, metin gibi görünen düğme. */
+    public static void cizgisiz(javax.swing.JButton b) {
+        b.putClientProperty(com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE,
+                com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE_BORDERLESS);
+    }
+
+    public static String hex(Color c) { return String.format("#%06X", c.getRGB() & 0xFFFFFF); }
+
     public static Color vurgu() { return koyu ? new Color(0x5B9BE6) : new Color(0x0B4A9E); }
     public static Color kart() { return koyu ? new Color(0x26292E) : Color.WHITE; }
     public static Color kartKenar() { return koyu ? new Color(0x34383F) : new Color(0xE2E6EE); }

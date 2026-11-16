@@ -30,7 +30,6 @@ import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
@@ -81,6 +80,7 @@ public class AnaPencere extends JFrame {
     private BirakmaAlani birakmaAlani;
     private final JButton temaDugmesi = new JButton();
     private final JButton dogrula = new JButton("Doğrula");
+    private JPanel solAkis;
 
     public AnaPencere(Yapilandirma y) {
         super("YÖBF Otomatörü");
@@ -96,6 +96,7 @@ public class AnaPencere extends JFrame {
         panel = new DuzenlemePaneli(y);
         panel.degisinceCalistir(this::canliDogrula);
         JPanel sol = new JPanel(new BorderLayout(0, 12));
+        solAkis = sol;
         sol.setOpaque(false);
         sol.add(belgeKarti(), BorderLayout.NORTH);
         sol.add(panel, BorderLayout.CENTER);
@@ -334,6 +335,7 @@ public class AnaPencere extends JFrame {
             JPanel etiket = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
             etiket.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE, "arc:999");
             etiket.setBackground(Tema.koyu() ? new Color(0x33405A) : new Color(0xE8EEF8));
+            etiket.putClientProperty(Kart.OPAK, true);
             etiket.setBorder(BorderFactory.createEmptyBorder(1, 6, 1, 2));
             String ad = p.getFileName().toString();
             JLabel l = new JLabel(ad.length() > 46 ? ad.substring(0, 43) + "…" : ad,
@@ -425,11 +427,11 @@ public class AnaPencere extends JFrame {
         JMenuItem klasor = new JMenuItem("Uygulama klasörünü aç");
         klasor.addActionListener(e -> ac(UygulamaYolu.kok()));
         JMenuItem hakkinda = new JMenuItem("Hakkında", Simgeler.al("bilgi", 16));
-        hakkinda.addActionListener(e -> JOptionPane.showMessageDialog(this,
-                "YÖBF Otomatörü\nYönetici Özet Bilgilendirme Formu hazırlama aracı.\n\n"
-                        + "Model: " + y.ayarlar().model() + "\nUygulama klasörü: " + UygulamaYolu.kok()
-                        + "\nAPI anahtarı dosyası: " + ApiAnahtari.dosya(),
-                "Hakkında", JOptionPane.INFORMATION_MESSAGE));
+        hakkinda.addActionListener(e -> Diyalog.bilgi(this, Diyalog.Tur.BILGI, "YÖBF Otomatörü",
+                "Yönetici Özet Bilgilendirme Formu hazırlama aracı.<br><br>"
+                        + "<b>Varsayılan model:</b> " + y.ayarlar().model()
+                        + "<br><b>Uygulama klasörü:</b> " + UygulamaYolu.kok()
+                        + "<br><b>API anahtarı dosyası:</b> " + ApiAnahtari.dosya()));
         JMenuItem cik = new JMenuItem("Çıkış");
         cik.addActionListener(e -> dispose());
         m.add(ekle);
@@ -529,8 +531,8 @@ public class AnaPencere extends JFrame {
             else if (!belgeler.contains(p)) belgeler.addElement(p);
         }
         if (!red.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Yalnızca PDF ve DOCX desteklenir:\n" + String.join("\n", red),
-                    "Desteklenmeyen dosya", JOptionPane.WARNING_MESSAGE);
+            Bildirim.goster(this, Diyalog.Tur.UYARI, "Desteklenmeyen dosya",
+                    "Yalnızca PDF ve DOCX eklenebilir: " + String.join(", ", red));
         }
     }
 
@@ -548,7 +550,7 @@ public class AnaPencere extends JFrame {
 
     private void analizEt() {
         if (belgeler.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Önce en az bir belge ekleyin.", "Analiz", JOptionPane.INFORMATION_MESSAGE);
+            Bildirim.goster(this, Diyalog.Tur.BILGI, "Belge yok", "Analiz için önce en az bir PDF veya Word belgesi ekleyin.");
             return;
         }
         String anahtar = ApiAnahtari.oku().orElse(null);
@@ -636,8 +638,8 @@ public class AnaPencere extends JFrame {
                     Throwable t = e.getCause();
                     String baslik = t instanceof TaranmisBelgeException ? "Taranmış belge" : "Analiz hatası";
                     durum(baslik + ": " + t.getMessage());
-                    JOptionPane.showMessageDialog(AnaPencere.this, t.getMessage(), baslik,
-                            t instanceof TaranmisBelgeException ? JOptionPane.WARNING_MESSAGE : JOptionPane.ERROR_MESSAGE);
+                    Diyalog.bilgi(AnaPencere.this, t instanceof TaranmisBelgeException ? Diyalog.Tur.UYARI : Diyalog.Tur.HATA,
+                            baslik, t.getMessage());
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -696,38 +698,68 @@ public class AnaPencere extends JFrame {
         LogoCozumleyici.Sonuc ls = lc.coz(f.logoIcinSirketler(), panel.secilenLogo());
         LogoCozumleyici.Aday secilen = ls.secili();
         if (ls.kullaniciyaSor()) {
-            Object s = JOptionPane.showInputDialog(this,
-                    "Taraflarda farklı logolara sahip birden fazla grup şirketi var. Hangi logo kullanılsın?",
-                    "Logo seçimi", JOptionPane.QUESTION_MESSAGE, null, ls.adaylar().toArray(), ls.secili());
-            if (s == null) return;
-            secilen = (LogoCozumleyici.Aday) s;
+            JList<LogoCozumleyici.Aday> secim = new JList<>(ls.adaylar().toArray(new LogoCozumleyici.Aday[0]));
+            secim.setSelectedValue(ls.secili(), true);
+            secim.setCellRenderer((l, v, i, sec, odak) -> {
+                JLabel r = new JLabel("<html><b>" + (v.dosya() == null ? "(logo yok)" : v.dosya().getFileName()) + "</b><br>"
+                        + String.join("<br>", v.sirketler().stream().map(legal.erk.yobf.config.SirketKaydi::unvan).toList()) + "</html>");
+                if (v.dosya() != null) {
+                    try {
+                        java.awt.image.BufferedImage im = javax.imageio.ImageIO.read(v.dosya().toFile());
+                        int h = 36, w = Math.min(170, im.getWidth() * h / im.getHeight());
+                        r.setIcon(new javax.swing.ImageIcon(im.getScaledInstance(w, Math.max(1, im.getHeight() * w / im.getWidth()),
+                                java.awt.Image.SCALE_SMOOTH)));
+                    } catch (Exception ignored) {
+                        // önizlemesiz
+                    }
+                }
+                r.setIconTextGap(14);
+                r.setOpaque(true);
+                r.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+                r.setBackground(sec ? new Color(Tema.vurgu().getRed(), Tema.vurgu().getGreen(), Tema.vurgu().getBlue(), 40) : Tema.kart());
+                r.setForeground(UIManagerRenk.yazi());
+                return r;
+            });
+            JScrollPane sp = new JScrollPane(secim);
+            sp.setPreferredSize(new Dimension(480, Math.min(300, 70 * ls.adaylar().size() + 6)));
+            if (!Diyalog.onayla(this, Diyalog.Tur.SORU, "Logo seçimi",
+                    "Taraflarda farklı logolara sahip birden fazla grup şirketi var. Formda hangi logo kullanılsın?",
+                    sp, "Vazgeç", "Bu logoyu kullan") || secim.getSelectedValue() == null) {
+                return;
+            }
+            secilen = secim.getSelectedValue();
         }
         f.logo = secilen.dosya();
         List<String> ekUyari = new ArrayList<>();
         ls.uyari().ifPresent(ekUyari::add);
 
         // 2) Kullanıcı onayı — hiçbir alan onaysız nihai çıktıya yazılmaz
-        StringBuilder m = new StringBuilder("<html><body style='width:420px'>");
         long kirmizi = u.stream().filter(x -> x.seviye() == Uyari.Seviye.KIRMIZI).count();
         long sari = u.size() - kirmizi;
-        if (kirmizi > 0) m.append("<p style='color:#C62828'><b>").append(kirmizi).append(" kırmızı uyarı var.</b></p>");
-        if (sari > 0) m.append("<p style='color:#8D6E00'>").append(sari).append(" sarı uyarı var.</p>");
-        for (String s : ekUyari) m.append("<p>").append(s).append("</p>");
-        m.append("<p>Çıktı: <b>").append(pdf ? "PDF" : "Word (.docx)").append("</b><br>Form türü: <b>")
-                .append(f.formTuru).append("</b><br>Logo: ")
-                .append(f.logo == null ? "(yok)" : f.logo.getFileName()).append("<br>İmzacı: ")
-                .append(f.anaImzacilar.size()).append(f.ekOnayAcik ? " + 1 ek onay" : "").append("</p>");
-        m.append("<p>Ekrandaki tüm alanları kontrol ettiğinizi ve forma yazılmasını onaylıyor musunuz?</p></body></html>");
+        JPanel ozet = new JPanel(new java.awt.GridLayout(2, 2, 10, 10));
+        ozet.add(ozetKutusu("Çıktı", pdf ? "PDF" : "Word (.docx)", pdf ? "pdf" : "word"));
+        ozet.add(ozetKutusu("Form türü", f.formTuru, "belge"));
+        ozet.add(ozetKutusu("Logo", f.logo == null ? "(yok)" : f.logo.getFileName().toString(), "goz"));
+        ozet.add(ozetKutusu("İmzacı", f.anaImzacilar.size() + (f.ekOnayAcik ? " + 1 ek onay" : ""), "onay"));
+        JPanel govde = new JPanel(new BorderLayout(0, 12));
+        govde.add(ozet, BorderLayout.NORTH);
+        JPanel uyariKutusu = new JPanel();
+        uyariKutusu.setLayout(new javax.swing.BoxLayout(uyariKutusu, javax.swing.BoxLayout.Y_AXIS));
+        if (kirmizi > 0) uyariKutusu.add(serit(Diyalog.Tur.HATA, kirmizi + " kırmızı uyarı var — kontrol etmeden devam etmeyin."));
+        if (sari > 0) uyariKutusu.add(serit(Diyalog.Tur.UYARI, sari + " sarı uyarı var."));
+        for (String s2 : ekUyari) uyariKutusu.add(serit(Diyalog.Tur.UYARI, s2));
+        if (u.isEmpty() && ekUyari.isEmpty()) uyariKutusu.add(serit(Diyalog.Tur.BASARI, "Doğrulama uyarısı yok."));
+        govde.add(uyariKutusu, BorderLayout.CENTER);
         javax.swing.JCheckBox ekKutu = pdf
                 ? new javax.swing.JCheckBox("Word (.docx) dosyasını da yanına kaydet", tercihler.wordDeSakla())
-                : new javax.swing.JCheckBox("PDF olarak da kaydet (bilgisayarda Microsoft Word veya LibreOffice yüklü olmalı)",
+                : new javax.swing.JCheckBox("PDF olarak da kaydet (Microsoft Word veya LibreOffice gerekir)",
                         tercihler.pdfDeOlustur());
-        JPanel onayPaneli = new JPanel(new BorderLayout(4, 10));
-        onayPaneli.add(new JLabel(m.toString()), BorderLayout.CENTER);
-        onayPaneli.add(ekKutu, BorderLayout.SOUTH);
-        int onay = JOptionPane.showConfirmDialog(this, onayPaneli, "Onay",
-                JOptionPane.YES_NO_OPTION, kirmizi > 0 ? JOptionPane.WARNING_MESSAGE : JOptionPane.QUESTION_MESSAGE);
-        if (onay != JOptionPane.YES_OPTION) return;
+        govde.add(ekKutu, BorderLayout.SOUTH);
+        if (!Diyalog.onayla(this, kirmizi > 0 ? Diyalog.Tur.UYARI : Diyalog.Tur.SORU, "Formu onaylıyor musunuz?",
+                "Ekrandaki tüm alanları kontrol ettiğinizi ve forma yazılmasını onaylıyor musunuz?",
+                govde, "Vazgeç", pdf ? "Onayla ve PDF oluştur" : "Onayla ve kaydet")) {
+            return;
+        }
         boolean ek = ekKutu.isSelected();
         adim(3);
         if (pdf) tercihler.wordDeSaklaAyarla(ek);
@@ -748,8 +780,8 @@ public class AnaPencere extends JFrame {
         if (!hedef.getFileName().toString().toLowerCase().endsWith(uzanti)) {
             hedef = hedef.resolveSibling(hedef.getFileName() + uzanti);
         }
-        if (Files.exists(hedef) && JOptionPane.showConfirmDialog(this, hedef.getFileName() + " zaten var. Üzerine yazılsın mı?",
-                "Kaydet", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+        if (Files.exists(hedef) && !Diyalog.onayla(this, Diyalog.Tur.UYARI, "Dosya zaten var",
+                "<b>" + hedef.getFileName() + "</b> bu klasörde zaten var. Üzerine yazılsın mı?", null, "Vazgeç", "Üzerine yaz")) {
             return;
         }
 
@@ -768,14 +800,75 @@ public class AnaPencere extends JFrame {
                 durum("Kaydedildi: " + hedef);
                 if (ek) {
                     pdfeCevir(hedef, legal.erk.yobf.render.PdfDonusturucu.pdfYolu(hedef), hedef, null);
-                } else if (JOptionPane.showConfirmDialog(this, "Form oluşturuldu:\n" + hedef + "\n\nŞimdi açılsın mı?",
-                        "Tamamlandı", JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE) == JOptionPane.YES_OPTION) {
-                    ac(hedef);
+                } else {
+                    Path h2 = hedef;
+                    Bildirim.goster(this, Diyalog.Tur.BASARI, "Word belgesi kaydedildi", h2.getFileName().toString(),
+                            eylemler("Belgeyi aç", () -> ac(h2), "Klasörü aç", () -> ac(h2.toAbsolutePath().getParent())));
                 }
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Dosya yazılamadı:\n" + e.getMessage(), "Hata", JOptionPane.ERROR_MESSAGE);
+            Diyalog.bilgi(this, Diyalog.Tur.HATA, "Dosya yazılamadı", e.getMessage());
         }
+    }
+
+    /** Onay penceresindeki özet kutucuğu (simge + küçük başlık + değer). */
+    private static JPanel ozetKutusu(String baslik, String deger, String simge) {
+        JPanel k = new JPanel(new BorderLayout(10, 0));
+        k.setOpaque(true);
+        k.setBackground(Tema.koyu() ? new Color(0x2E3238) : new Color(0xF3F6FB));
+        k.putClientProperty(Kart.OPAK, true);
+        k.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE, "arc:12");
+        k.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+        k.add(new JLabel(Simgeler.vurgu(simge, 20)), BorderLayout.WEST);
+        JPanel y = new JPanel(new BorderLayout(0, 1));
+        y.setOpaque(false);
+        JLabel b = new JLabel(baslik);
+        b.setForeground(Tema.ikincilYazi());
+        b.setFont(b.getFont().deriveFont(11.5f));
+        JLabel d = new JLabel(deger);
+        d.setFont(d.getFont().deriveFont(java.awt.Font.BOLD));
+        y.add(b, BorderLayout.NORTH);
+        y.add(d, BorderLayout.CENTER);
+        k.add(y, BorderLayout.CENTER);
+        return k;
+    }
+
+    /** Renkli bilgi şeridi (uyarı / başarı). */
+    private static JPanel serit(Diyalog.Tur tur, String metin) {
+        Color r = tur.renk();
+        JPanel p = new JPanel(new BorderLayout(8, 0));
+        p.setOpaque(true);
+        p.setBackground(new Color(r.getRed(), r.getGreen(), r.getBlue(), Tema.koyu() ? 50 : 26));
+        p.putClientProperty(Kart.OPAK, true);
+        p.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE, "arc:10");
+        p.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+        p.add(new JLabel(Simgeler.al(tur.simge, 16, r)), BorderLayout.WEST);
+        p.add(new JLabel("<html>" + metin + "</html>"), BorderLayout.CENTER);
+        p.setAlignmentX(0f);
+        JPanel dis = new JPanel(new BorderLayout());
+        dis.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
+        dis.add(p);
+        dis.setAlignmentX(0f);
+        return dis;
+    }
+
+    /** Bildirim eylemleri (sıralı): ad1, eylem1, ad2, eylem2 … */
+    private static java.util.Map<String, Runnable> eylemler(String a, Runnable ea, String b, Runnable eb) {
+        java.util.Map<String, Runnable> m = new java.util.LinkedHashMap<>();
+        m.put(a, ea);
+        m.put(b, eb);
+        return m;
+    }
+
+    private static java.util.Map<String, Runnable> eylemler(String a, Runnable ea, String b, Runnable eb, String c, Runnable ec) {
+        java.util.Map<String, Runnable> m = eylemler(a, ea, b, eb);
+        m.put(c, ec);
+        return m;
+    }
+
+    /** UIManager yazı rengi (koyu/açık temaya uyar). */
+    private static final class UIManagerRenk {
+        static Color yazi() { return javax.swing.UIManager.getColor("Label.foreground"); }
     }
 
     /** PDF hedefinin yanındaki .docx adı. */
@@ -830,13 +923,12 @@ public class AnaPencere extends JFrame {
                         return;
                     }
                     durum("Kaydedildi: " + pdf + (saklanacakDocx != null ? " (+ " + saklanacakDocx.getFileName() + ")" : ""));
-                    Object[] secenekler = saklanacakDocx != null
-                            ? new Object[]{"PDF'i aç", "Word'ü aç", "Kapat"} : new Object[]{"PDF'i aç", "Kapat"};
-                    int s = JOptionPane.showOptionDialog(AnaPencere.this, "Form oluşturuldu:\n" + pdf
-                                    + (saklanacakDocx != null ? "\n" + saklanacakDocx : ""), "Tamamlandı",
-                            JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, secenekler, secenekler[0]);
-                    if (s == 0) ac(pdf);
-                    else if (s == 1 && saklanacakDocx != null) ac(saklanacakDocx);
+                    Bildirim.goster(AnaPencere.this, Diyalog.Tur.BASARI, "PDF oluşturuldu",
+                            pdf.getFileName() + (saklanacakDocx != null ? " ve " + saklanacakDocx.getFileName() : ""),
+                            saklanacakDocx != null
+                                    ? eylemler("PDF'i aç", () -> ac(pdf), "Word'ü aç", () -> ac(saklanacakDocx),
+                                            "Klasörü aç", () -> ac(pdf.toAbsolutePath().getParent()))
+                                    : eylemler("PDF'i aç", () -> ac(pdf), "Klasörü aç", () -> ac(pdf.toAbsolutePath().getParent())));
                 } catch (ExecutionException e) {
                     pdfYapilamadi(e.getCause().getMessage(), docx, hedefPdf, saklanacakDocx);
                 } catch (InterruptedException e) {
@@ -853,20 +945,21 @@ public class AnaPencere extends JFrame {
         durum("PDF oluşturulamadı: " + neden);
         boolean wordVar = saklanacakDocx != null && Files.exists(saklanacakDocx);
         if (wordVar) {
-            JOptionPane.showMessageDialog(this, "Word belgesi kaydedildi:\n" + saklanacakDocx + "\n\nPDF oluşturulamadı: " + neden
-                    + "\nPDF'i Word'de 'Farklı Kaydet → PDF' ile alabilirsiniz.", "PDF", JOptionPane.WARNING_MESSAGE);
+            Diyalog.bilgi(this, Diyalog.Tur.UYARI, "PDF oluşturulamadı",
+                    "Word belgesi kaydedildi: <b>" + saklanacakDocx.getFileName() + "</b><br><br>" + neden
+                            + "<br><br>PDF'i Word'de <i>Farklı Kaydet → PDF</i> ile alabilirsiniz.");
             return;
         }
         Path yedek = PdfDonusturucuYardim.docxYolu(hedefPdf);
-        if (JOptionPane.showConfirmDialog(this, "PDF oluşturulamadı: " + neden
-                        + "\n\nForm Word (.docx) olarak kaydedilsin mi?\n" + yedek, "PDF",
-                JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION) {
+        if (Diyalog.onayla(this, Diyalog.Tur.UYARI, "PDF oluşturulamadı",
+                neden + "<br><br>Form Word (.docx) olarak kaydedilsin mi?<br><b>" + yedek.getFileName() + "</b>",
+                null, "Vazgeç", "Word olarak kaydet")) {
             try {
                 Files.copy(docx, yedek, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 durum("Word olarak kaydedildi: " + yedek);
                 ac(yedek);
             } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Kaydedilemedi: " + e.getMessage(), "Hata", JOptionPane.ERROR_MESSAGE);
+                Diyalog.bilgi(this, Diyalog.Tur.HATA, "Kaydedilemedi", e.getMessage());
             }
         }
     }
@@ -882,20 +975,26 @@ public class AnaPencere extends JFrame {
     }
 
     private void anahtarGir() {
-        JPasswordField pf = new JPasswordField(40);
-        JPanel p = new JPanel(new BorderLayout(4, 4));
-        p.add(new JLabel("<html>Anthropic API anahtarı<br><small>Şuraya kaydedilir: " + ApiAnahtari.dosya()
-                + "<br>(ANTHROPIC_API_KEY ortam değişkeni tanımlıysa o önceliklidir)</small></html>"), BorderLayout.NORTH);
-        p.add(pf, BorderLayout.CENTER);
-        if (JOptionPane.showConfirmDialog(this, p, "API Anahtarı", JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
+        JPasswordField pf = new JPasswordField(36);
+        pf.putClientProperty(com.formdev.flatlaf.FlatClientProperties.PLACEHOLDER_TEXT, "sk-ant-…");
+        pf.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE, "showRevealButton:true");
+        JPanel p = new JPanel(new BorderLayout(0, 8));
+        p.add(pf, BorderLayout.NORTH);
+        JLabel not = new JLabel("<html>Şuraya kaydedilir: " + ApiAnahtari.dosya()
+                + "<br>ANTHROPIC_API_KEY ortam değişkeni tanımlıysa o önceliklidir.</html>");
+        not.setForeground(Tema.ikincilYazi());
+        not.setFont(not.getFont().deriveFont(11.5f));
+        p.add(not, BorderLayout.CENTER);
+        if (Diyalog.onayla(this, Diyalog.Tur.BILGI, "API anahtarı", "Anthropic API anahtarınızı girin.",
+                p, "Vazgeç", "Kaydet")) {
             String k = new String(pf.getPassword()).trim();
             if (k.isEmpty()) return;
             try {
                 ApiAnahtari.kaydet(k);
                 durum("API anahtarı kaydedildi.");
+                Bildirim.goster(this, Diyalog.Tur.BASARI, "API anahtarı kaydedildi", null);
             } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Kaydedilemedi: " + e.getMessage(), "Hata", JOptionPane.ERROR_MESSAGE);
+                Diyalog.bilgi(this, Diyalog.Tur.HATA, "Kaydedilemedi", e.getMessage());
             }
         }
     }
@@ -904,27 +1003,31 @@ public class AnaPencere extends JFrame {
         try {
             Yapilandirma yeni = Yapilandirma.yukle();
             FormVerisi f = panel.oku();
+            DuzenlemePaneli eskiPanel = panel;
             this.y = yeni;
             panel = new DuzenlemePaneli(yeni);
             panel.degisinceCalistir(this::canliDogrula);
-            panelKaydirma.setViewportView(panel);
+            solAkis.remove(eskiPanel);
+            solAkis.add(panel, BorderLayout.CENTER);
+            solAkis.revalidate();
             panel.yukle(f);
             canliDogrula();
             durum("Yapılandırma yeniden yüklendi.");
+            Bildirim.goster(this, Diyalog.Tur.BASARI, "Yapılandırma yeniden yüklendi", "config/ klasöründeki değişiklikler uygulandı.");
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, e.getMessage(), "Yapılandırma hatası", JOptionPane.ERROR_MESSAGE);
+            Diyalog.bilgi(this, Diyalog.Tur.HATA, "Yapılandırma hatası", e.getMessage());
         }
     }
 
     private void ac(Path p) {
         try {
             if (Files.notExists(p)) {
-                JOptionPane.showMessageDialog(this, "Henüz yok: " + p);
+                Bildirim.goster(this, Diyalog.Tur.UYARI, "Dosya bulunamadı", p.toString());
                 return;
             }
             Desktop.getDesktop().open(p.toFile());
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Açılamadı: " + p + "\n" + e.getMessage());
+            Bildirim.goster(this, Diyalog.Tur.HATA, "Açılamadı", p.getFileName() + ": " + e.getMessage());
         }
     }
 
