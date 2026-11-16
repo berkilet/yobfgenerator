@@ -88,7 +88,7 @@ public class ImzaciPaneli extends JPanel {
         ust.add(elle);
         add(ust, BorderLayout.NORTH);
 
-        JScrollPane sp = new JScrollPane(liste);
+        JScrollPane sp = Kaydirma.icIce(new JScrollPane(liste));
         sp.setPreferredSize(new Dimension(420, 176));
         for (JButton b : new JButton[]{yukari, asagi, kaldir}) {
             b.putClientProperty(com.formdev.flatlaf.FlatClientProperties.BUTTON_TYPE,

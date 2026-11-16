@@ -94,7 +94,7 @@ class DogrulayiciTest {
         f.sonaErmeTarihi = "01.01.2020";
         f.ekOnayAcik = true;
         f.ekOnayImzaci = new Imzaci("", "", "", "");
-        List<Uyari> u = d.dogrula(f, null);
+        List<Uyari> u = d.dogrula(f, (String) null);
         assertTrue(u.stream().anyMatch(x -> x.alan().equals("Sona Erme Tarihi") && x.mesaj().contains("geçmişte")));
         assertTrue(u.stream().anyMatch(x -> x.alan().equals("Ek Onay")));
     }

@@ -160,7 +160,7 @@ public class EkSatirlarPaneli extends JPanel {
             c.gridx = 1;
             c.gridwidth = 2;
             c.fill = GridBagConstraints.HORIZONTAL;
-            JScrollPane sp = new JScrollPane(deger);
+            JScrollPane sp = Kaydirma.icIce(new JScrollPane(deger));
             sp.setPreferredSize(new Dimension(300, 48));
             panel.add(sp, c);
 

@@ -28,13 +28,35 @@ public final class Dogrulayici {
     }
 
     /**
+     * Kaynak metnin doğrulama için hazırlanmış hali. Uzun belgelerde normalize etme ve sayı çıkarma
+     * pahalıdır; analizden sonra bir kez hazırlanır, her tuş vuruşundaki doğrulamada yeniden kullanılır.
+     */
+    public static final class Kaynak {
+        final String metin;
+        /** Başında ve sonunda boşluk olan normalize metin (bütün kelime araması için). */
+        final String norm;
+        final Set<BigDecimal> sayilar;
+
+        public Kaynak(String metin) {
+            this.metin = metin;
+            this.norm = " " + UnvanNormalizer.normalize(metin) + " ";
+            this.sayilar = TurkSayi.metindekiSayilar(metin);
+        }
+    }
+
+    /**
      * @param form       doğrulanacak form
      * @param kaynakMetin belgelerden çıkarılan (maskeli) metin; null ise kaynak kontrolleri atlanır
      */
     public List<Uyari> dogrula(FormVerisi form, String kaynakMetin) {
+        return dogrula(form, kaynakMetin == null ? null : new Kaynak(kaynakMetin));
+    }
+
+    public List<Uyari> dogrula(FormVerisi form, Kaynak kaynak) {
         List<Uyari> u = new ArrayList<>();
-        String kaynakNorm = kaynakMetin == null ? null : UnvanNormalizer.normalize(kaynakMetin);
-        Set<BigDecimal> kaynakSayilar = kaynakMetin == null ? Set.of() : TurkSayi.metindekiSayilar(kaynakMetin);
+        String kaynakMetin = kaynak == null ? null : kaynak.metin;
+        String kaynakNorm = kaynak == null ? null : kaynak.norm;
+        Set<BigDecimal> kaynakSayilar = kaynak == null ? Set.of() : kaynak.sayilar;
 
         // 3. Tarih
         if (!form.dahil(Satirlar.TARIH)) {
@@ -127,15 +149,21 @@ public final class Dogrulayici {
         return u;
     }
 
+    /** kaynakNorm: başında/sonunda boşluk olan normalize metin (Kaynak.norm). */
     private boolean kaynaktaVar(String taraf, String kaynakNorm) {
-        if (UnvanNormalizer.metindeGeciyor(taraf, kaynakNorm)) return true;
-        if (UnvanNormalizer.metindeGeciyor(UnvanNormalizer.parantezsiz(taraf), kaynakNorm)) return true;
+        if (gecer(taraf, kaynakNorm)) return true;
+        if (gecer(UnvanNormalizer.parantezsiz(taraf), kaynakNorm)) return true;
         Optional<SirketKaydi> k = UnvanNormalizer.esle(taraf, sirketler.sirketler());
         if (k.isPresent()) {
-            if (UnvanNormalizer.metindeGeciyor(k.get().unvan(), kaynakNorm)) return true;
-            for (String t : k.get().takmaAdlar()) if (UnvanNormalizer.metindeGeciyor(t, kaynakNorm)) return true;
+            if (gecer(k.get().unvan(), kaynakNorm)) return true;
+            for (String t : k.get().takmaAdlar()) if (gecer(t, kaynakNorm)) return true;
         }
         return false;
+    }
+
+    private static boolean gecer(String ifade, String bosluklKaynak) {
+        String n = UnvanNormalizer.normalize(ifade);
+        return !n.isEmpty() && bosluklKaynak.contains(" " + n + " ");
     }
 
     public static boolean engelleyiciVar(List<Uyari> uyarilar) {

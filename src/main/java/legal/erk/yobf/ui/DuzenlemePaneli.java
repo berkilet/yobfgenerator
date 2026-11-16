@@ -341,7 +341,7 @@ public class DuzenlemePaneli extends JPanel {
     }
 
     private static JScrollPane kaydir(JTextArea t) {
-        return new JScrollPane(t);
+        return Kaydirma.icIce(new JScrollPane(t));
     }
 
     private static JComboBox<String> duzenlenebilir(List<String> secenekler) {

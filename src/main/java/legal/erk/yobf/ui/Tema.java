@@ -43,7 +43,8 @@ public final class Tema {
         UIManager.put("ScrollBar.thumbInsets", new Insets(2, 2, 2, 2));
         UIManager.put("ScrollBar.width", 10);
         UIManager.put("ScrollBar.showButtons", false);
-        UIManager.put("ScrollPane.smoothScrolling", true);
+        // Yumuşak kaydırma animasyonu tekerleğe gecikmeli tepki hissi veriyor: kapalı.
+        UIManager.put("ScrollPane.smoothScrolling", false);
         UIManager.put("TabbedPane.showTabSeparators", false);
         UIManager.put("TabbedPane.tabHeight", 34);
         UIManager.put("SplitPane.dividerSize", 8);

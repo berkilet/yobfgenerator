@@ -71,7 +71,10 @@ public class AnaPencere extends JFrame {
     private DuzenlemePaneli panel;
     private JScrollPane panelKaydirma;
     /** Son analizdeki maskeli kaynak metin (doğrulama için). Maskelenen değerler modele gitmez. */
-    private String kaynakMetin;
+    private Dogrulayici.Kaynak kaynak;
+    private List<Uyari> sonUyarilar;
+    /** Yazarken her tuşta değil, kısa bir duraksamadan sonra doğrular (arayüz akıcı kalır). */
+    private final javax.swing.Timer dogrulamaZamanlayici = new javax.swing.Timer(150, e -> canliDogrula());
 
     private final JLabel[] adimlar = new JLabel[3];
     private int aktifAdim = 1;
@@ -86,6 +89,7 @@ public class AnaPencere extends JFrame {
         super("YÖBF Otomatörü");
         this.y = y;
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+        dogrulamaZamanlayici.setRepeats(false);
         setIconImages(Ikonlar.liste());
         setLayout(new BorderLayout());
         getRootPane().putClientProperty("JRootPane.titleBarBackground", Tema.ustBant());
@@ -94,7 +98,7 @@ public class AnaPencere extends JFrame {
         add(ustBant(), BorderLayout.NORTH);
 
         panel = new DuzenlemePaneli(y);
-        panel.degisinceCalistir(this::canliDogrula);
+        panel.degisinceCalistir(dogrulamaZamanlayici::restart);
         JPanel sol = new JPanel(new BorderLayout(0, 12));
         solAkis = sol;
         sol.setOpaque(false);
@@ -106,7 +110,8 @@ public class AnaPencere extends JFrame {
         solKenar.add(sol, BorderLayout.CENTER);
         panelKaydirma = new JScrollPane(solKenar);
         panelKaydirma.setBorder(BorderFactory.createEmptyBorder());
-        panelKaydirma.getVerticalScrollBar().setUnitIncrement(18);
+        panelKaydirma.getVerticalScrollBar().setUnitIncrement(Kaydirma.ADIM);
+        panelKaydirma.getVerticalScrollBar().setBlockIncrement(400);
 
         JPanel sag = new JPanel(new BorderLayout());
         sag.setBorder(BorderFactory.createEmptyBorder(16, 8, 16, 16));
@@ -542,7 +547,7 @@ public class AnaPencere extends JFrame {
         f.imzayaSunanDepartman = y.ayarlar().imzayaSunanVarsayilan();
         f.ekOnayBaslik = y.ayarlar().imzaBlogu().ekOnayBaslik();
         f.ekOnayAcik = y.ayarlar().imzaBlogu().ekOnayAcikVarsayilan();
-        kaynakMetin = null;
+        kaynak = null;
         dikkat.clear();
         panel.yukle(f);
         canliDogrula();
@@ -592,7 +597,8 @@ public class AnaPencere extends JFrame {
                 boolean ikiDilli = "YOBF_TR_EN".equals(tercih);
                 try (ClaudeIstemci c = new ClaudeIstemci(y.ayarlar(), modelId, UygulamaYolu.prompt("ozet_prompt.md"), apiAnahtari)) {
                     OzetSemasi o = c.ozetCikar(maskeli, ikiDilli, this::publish);
-                    return new Object[]{o, kaynak.toString(), dosyalar.size()};
+                    // Uzun belgede pahalı hazırlık arka planda, bir kez
+                    return new Object[]{o, new Dogrulayici.Kaynak(kaynak.toString()), dosyalar.size()};
                 }
             }
 
@@ -607,7 +613,7 @@ public class AnaPencere extends JFrame {
                 try {
                     Object[] r = get();
                     OzetSemasi o = (OzetSemasi) r[0];
-                    kaynakMetin = (String) r[1];
+                    AnaPencere.this.kaynak = (Dogrulayici.Kaynak) r[1];
                     FormHazirlayici h = new FormHazirlayici(y);
                     FormVerisi f = h.hazirla(o, (int) r[2]);
                     if (tercih != null) f.formTuru = tercih;
@@ -653,10 +659,15 @@ public class AnaPencere extends JFrame {
 
     private List<Uyari> canliDogrula() {
         if (panel == null) return List.of();
-        List<Uyari> l = new Dogrulayici(y.ayarlar(), y.sirketler()).dogrula(panel.oku(), kaynakMetin);
-        uyarilar.clear();
-        l.stream().sorted((a, b) -> b.seviye().compareTo(a.seviye())).forEach(uyarilar::addElement);
-        panel.isaretle(l);
+        dogrulamaZamanlayici.stop();
+        List<Uyari> l = new Dogrulayici(y.ayarlar(), y.sirketler()).dogrula(panel.oku(), kaynak);
+        // Uyarılar değişmediyse listeyi ve alan çerçevelerini yeniden kurma (gereksiz yeniden çizim olmasın)
+        if (!l.equals(sonUyarilar)) {
+            sonUyarilar = List.copyOf(l);
+            uyarilar.clear();
+            l.stream().sorted((a, b) -> b.seviye().compareTo(a.seviye())).forEach(uyarilar::addElement);
+            panel.isaretle(l);
+        }
         onizlemeZamanlayici.restart();
         return l;
     }
@@ -1006,7 +1017,8 @@ public class AnaPencere extends JFrame {
             DuzenlemePaneli eskiPanel = panel;
             this.y = yeni;
             panel = new DuzenlemePaneli(yeni);
-            panel.degisinceCalistir(this::canliDogrula);
+            sonUyarilar = null;
+            panel.degisinceCalistir(dogrulamaZamanlayici::restart);
             solAkis.remove(eskiPanel);
             solAkis.add(panel, BorderLayout.CENTER);
             solAkis.revalidate();

@@ -51,6 +51,8 @@ public class OnizlemePaneli extends JPanel {
     private final FormYazici yazici;
     private FormVerisi form;
     private final Map<Path, BufferedImage> logoOnbellek = new HashMap<>();
+    /** Önizleme çiziminde aynı biçim tekrar tekrar istenir; fontlar bir kez oluşturulur. */
+    private static final Map<String, Font> FONT_ONBELLEK = new java.util.concurrent.ConcurrentHashMap<>();
 
     public OnizlemePaneli(Ayarlar ayarlar) {
         this.ayarlar = ayarlar;
@@ -150,13 +152,18 @@ public class OnizlemePaneli extends JPanel {
         Parca duz(String m) { return p(m, false, false, false, FormYazici.GOVDE); }
 
         Font font(Parca p) {
+            String anahtar = p.punto() + "|" + p.kalin() + p.italik() + p.altiCizili();
+            Font f = FONT_ONBELLEK.get(anahtar);
+            if (f != null) return f;
             Map<TextAttribute, Object> a = new HashMap<>();
             a.put(TextAttribute.FAMILY, YAZI_TIPI);
             a.put(TextAttribute.SIZE, (float) p.punto());
             if (p.kalin()) a.put(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD);
             if (p.italik()) a.put(TextAttribute.POSTURE, TextAttribute.POSTURE_OBLIQUE);
             if (p.altiCizili()) a.put(TextAttribute.UNDERLINE, TextAttribute.UNDERLINE_ON);
-            return Font.getFont(a);
+            f = Font.getFont(a);
+            FONT_ONBELLEK.put(anahtar, f);
+            return f;
         }
 
         double satirYuksekligi(double punto) { return punto * 1.1 * 1.17; }
