@@ -41,6 +41,13 @@ public final class Tercihler {
 
     public void pdfDeOlusturAyarla(boolean b) { veri.put("pdf_de_olustur", b); kaydet(); }
 
+    /** PDF oluştururken Word (.docx) dosyası da yanına kaydedilsin mi? */
+    public boolean wordDeSakla() {
+        return veri.path("word_de_sakla").asBoolean(false);
+    }
+
+    public void wordDeSaklaAyarla(boolean b) { veri.put("word_de_sakla", b); kaydet(); }
+
     private void kaydet() {
         try {
             Files.createDirectories(dosya.getParent());

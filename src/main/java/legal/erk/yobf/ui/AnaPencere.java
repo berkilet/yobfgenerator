@@ -63,6 +63,7 @@ public class AnaPencere extends JFrame {
     private final JLabel durum = new JLabel(" ");
     private final JButton analizEt = new JButton("Analiz Et");
     private final JButton wordOlustur = new JButton("Onayla ve Word Oluştur…");
+    private final JButton pdfOlusturBtn = new JButton("Onayla ve PDF Oluştur…");
     private final JComboBox<String> formTuruTercihi = new JComboBox<>();
     private final JComboBox<legal.erk.yobf.config.Ayarlar.ModelSecenegi> modelSecici = new JComboBox<>();
     private final legal.erk.yobf.config.Tercihler tercihler = legal.erk.yobf.config.Tercihler.varsayilan();
@@ -101,10 +102,13 @@ public class AnaPencere extends JFrame {
         JPanel btn = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         btn.add(dogrula);
         btn.add(wordOlustur);
+        btn.add(pdfOlusturBtn);
         alt.add(btn, BorderLayout.EAST);
         add(alt, BorderLayout.SOUTH);
 
-        wordOlustur.addActionListener(e -> wordOlustur());
+        wordOlustur.addActionListener(e -> olustur(false));
+        pdfOlusturBtn.addActionListener(e -> olustur(true));
+        pdfOlusturBtn.setToolTipText("Formu doğrudan PDF olarak kaydeder (bilgisayardaki Microsoft Word ile; yoksa LibreOffice)");
         setSize(new Dimension(1280, 860));
         setLocationRelativeTo(null);
 
@@ -127,8 +131,15 @@ public class AnaPencere extends JFrame {
         gunluk.addActionListener(e -> ac(IslemGunlugu.varsayilan().dosya()));
         JMenuItem cik = new JMenuItem("Çıkış");
         cik.addActionListener(e -> dispose());
+        JMenuItem wordMenu = new JMenuItem("Word Olarak Oluştur…");
+        wordMenu.addActionListener(e -> olustur(false));
+        JMenuItem pdfMenu = new JMenuItem("PDF Olarak Oluştur…");
+        pdfMenu.addActionListener(e -> olustur(true));
         dosya.add(ekle);
         dosya.add(bos);
+        dosya.addSeparator();
+        dosya.add(wordMenu);
+        dosya.add(pdfMenu);
         dosya.addSeparator();
         dosya.add(gunluk);
         dosya.addSeparator();
@@ -340,7 +351,7 @@ public class AnaPencere extends JFrame {
                 ? ms.id() : y.ayarlar().model();
 
         analizEt.setEnabled(false);
-        wordOlustur.setEnabled(false);
+        ciktiDugmeleri(false);
         new SwingWorker<Object[], String>() {
             @Override protected Object[] doInBackground() throws Exception {
                 Maskeleme mask = new Maskeleme(y.ayarlar().maskeleme());
@@ -374,7 +385,7 @@ public class AnaPencere extends JFrame {
 
             @Override protected void done() {
                 analizEt.setEnabled(true);
-                wordOlustur.setEnabled(true);
+                ciktiDugmeleri(true);
                 try {
                     Object[] r = get();
                     OzetSemasi o = (OzetSemasi) r[0];
@@ -450,7 +461,16 @@ public class AnaPencere extends JFrame {
         d.setVisible(true);
     }
 
-    private void wordOlustur() {
+    private void ciktiDugmeleri(boolean acik) {
+        wordOlustur.setEnabled(acik);
+        pdfOlusturBtn.setEnabled(acik);
+    }
+
+    /**
+     * Logo seçimi → kullanıcı onayı → kayıt. pdf=true: doğrudan PDF (Word/LibreOffice ile çevrilir,
+     * istenirse .docx de yanına kaydedilir); pdf=false: Word (.docx), istenirse PDF de.
+     */
+    private void olustur(boolean pdf) {
         FormVerisi f = panel.oku();
         List<Uyari> u = canliDogrula();
 
@@ -476,98 +496,171 @@ public class AnaPencere extends JFrame {
         if (kirmizi > 0) m.append("<p style='color:#C62828'><b>").append(kirmizi).append(" kırmızı uyarı var.</b></p>");
         if (sari > 0) m.append("<p style='color:#8D6E00'>").append(sari).append(" sarı uyarı var.</p>");
         for (String s : ekUyari) m.append("<p>").append(s).append("</p>");
-        m.append("<p>Form türü: <b>").append(f.formTuru).append("</b><br>Logo: ")
+        m.append("<p>Çıktı: <b>").append(pdf ? "PDF" : "Word (.docx)").append("</b><br>Form türü: <b>")
+                .append(f.formTuru).append("</b><br>Logo: ")
                 .append(f.logo == null ? "(yok)" : f.logo.getFileName()).append("<br>İmzacı: ")
                 .append(f.anaImzacilar.size()).append(f.ekOnayAcik ? " + 1 ek onay" : "").append("</p>");
         m.append("<p>Ekrandaki tüm alanları kontrol ettiğinizi ve forma yazılmasını onaylıyor musunuz?</p></body></html>");
-        javax.swing.JCheckBox pdfKutusu = new javax.swing.JCheckBox(
-                "PDF olarak da kaydet (bilgisayarda Microsoft Word veya LibreOffice yüklü olmalı)", tercihler.pdfDeOlustur());
+        javax.swing.JCheckBox ekKutu = pdf
+                ? new javax.swing.JCheckBox("Word (.docx) dosyasını da yanına kaydet", tercihler.wordDeSakla())
+                : new javax.swing.JCheckBox("PDF olarak da kaydet (bilgisayarda Microsoft Word veya LibreOffice yüklü olmalı)",
+                        tercihler.pdfDeOlustur());
         JPanel onayPaneli = new JPanel(new BorderLayout(4, 10));
         onayPaneli.add(new JLabel(m.toString()), BorderLayout.CENTER);
-        onayPaneli.add(pdfKutusu, BorderLayout.SOUTH);
+        onayPaneli.add(ekKutu, BorderLayout.SOUTH);
         int onay = JOptionPane.showConfirmDialog(this, onayPaneli, "Onay",
                 JOptionPane.YES_NO_OPTION, kirmizi > 0 ? JOptionPane.WARNING_MESSAGE : JOptionPane.QUESTION_MESSAGE);
         if (onay != JOptionPane.YES_OPTION) return;
-        boolean pdfDe = pdfKutusu.isSelected();
-        tercihler.pdfDeOlusturAyarla(pdfDe);
+        boolean ek = ekKutu.isSelected();
+        if (pdf) tercihler.wordDeSaklaAyarla(ek);
+        else tercihler.pdfDeOlusturAyarla(ek);
 
-        // 3) Kaydet
+        // 3) Kayıt yeri
         FormHazirlayici h = new FormHazirlayici(y);
         LocalDate t = TarihKontrol.coz(f.tarih).orElse(LocalDate.now());
         String ad = FormYazici.dosyaAdi(f, h::grupSirketiMi, t);
+        if (pdf) ad = ad.replaceFirst("(?i)\\.docx$", ".pdf");
+        String uzanti = pdf ? ".pdf" : ".docx";
         JFileChooser fc = new JFileChooser(belgeler.isEmpty() ? null : belgeler.get(0).getParent().toFile());
         fc.setSelectedFile(new File(fc.getCurrentDirectory(), ad));
-        fc.setFileFilter(new FileNameExtensionFilter("Word belgesi (.docx)", "docx"));
+        fc.setFileFilter(pdf ? new FileNameExtensionFilter("PDF belgesi (.pdf)", "pdf")
+                : new FileNameExtensionFilter("Word belgesi (.docx)", "docx"));
         if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         Path hedef = fc.getSelectedFile().toPath();
-        if (!hedef.getFileName().toString().toLowerCase().endsWith(".docx")) {
-            hedef = hedef.resolveSibling(hedef.getFileName() + ".docx");
+        if (!hedef.getFileName().toString().toLowerCase().endsWith(uzanti)) {
+            hedef = hedef.resolveSibling(hedef.getFileName() + uzanti);
         }
         if (Files.exists(hedef) && JOptionPane.showConfirmDialog(this, hedef.getFileName() + " zaten var. Üzerine yazılsın mı?",
                 "Kaydet", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
             return;
         }
+
+        // 4) Yaz
         try {
-            new FormYazici(y.ayarlar()).yaz(f, hedef);
-            List<String> adlar = new ArrayList<>();
-            for (int i = 0; i < belgeler.size(); i++) adlar.add(belgeler.get(i).getFileName().toString());
-            if (adlar.isEmpty()) adlar.add(hedef.getFileName().toString());
-            List<String> taraflar = f.logoIcinSirketler();
-            List<String> bedeller = f.sozlesmeler.stream().flatMap(g -> g.bedeller.stream()).map(Bedel::metin)
-                    .filter(s -> !s.isBlank()).toList();
-            try {
-                IslemGunlugu.varsayilan().ekle(adlar, f.formTuru, taraflar, bedeller);
-            } catch (Exception e) {
-                durum("Uyarı: işlem günlüğü yazılamadı — " + e.getMessage());
-            }
-            durum("Kaydedildi: " + hedef);
-            if (pdfDe) {
-                pdfOlustur(hedef);
-            } else if (JOptionPane.showConfirmDialog(this, "Form oluşturuldu:\n" + hedef + "\n\nŞimdi açılsın mı?", "Tamamlandı",
-                    JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE) == JOptionPane.YES_OPTION) {
-                ac(hedef);
+            if (pdf) {
+                Path docxYanina = PdfDonusturucuYardim.docxYolu(hedef);
+                Path gecici = Files.createTempDirectory("yobf");
+                Path docx = gecici.resolve(docxYanina.getFileName());
+                new FormYazici(y.ayarlar()).yaz(f, docx);
+                gunluge(f, hedef);
+                pdfeCevir(docx, hedef, ek ? docxYanina : null, gecici);
+            } else {
+                new FormYazici(y.ayarlar()).yaz(f, hedef);
+                gunluge(f, hedef);
+                durum("Kaydedildi: " + hedef);
+                if (ek) {
+                    pdfeCevir(hedef, legal.erk.yobf.render.PdfDonusturucu.pdfYolu(hedef), hedef, null);
+                } else if (JOptionPane.showConfirmDialog(this, "Form oluşturuldu:\n" + hedef + "\n\nŞimdi açılsın mı?",
+                        "Tamamlandı", JOptionPane.YES_NO_OPTION, JOptionPane.INFORMATION_MESSAGE) == JOptionPane.YES_OPTION) {
+                    ac(hedef);
+                }
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Word dosyası yazılamadı:\n" + e.getMessage(), "Hata", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Dosya yazılamadı:\n" + e.getMessage(), "Hata", JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    /** Word (yoksa LibreOffice) ile .docx'ten PDF üretir; arka planda çalışır. */
-    private void pdfOlustur(Path docx) {
-        wordOlustur.setEnabled(false);
-        durum("PDF oluşturuluyor (Word açılıyor, birkaç saniye sürebilir)…");
-        new SwingWorker<java.util.Optional<legal.erk.yobf.render.PdfDonusturucu.Sonuc>, Void>() {
-            @Override protected java.util.Optional<legal.erk.yobf.render.PdfDonusturucu.Sonuc> doInBackground() throws Exception {
-                return legal.erk.yobf.render.PdfDonusturucu.donustur(docx);
+    /** PDF hedefinin yanındaki .docx adı. */
+    private static final class PdfDonusturucuYardim {
+        static Path docxYolu(Path pdf) {
+            String n = pdf.getFileName().toString().replaceFirst("(?i)\\.pdf$", "") + ".docx";
+            return pdf.toAbsolutePath().resolveSibling(n);
+        }
+    }
+
+    private void gunluge(FormVerisi f, Path hedef) {
+        List<String> adlar = new ArrayList<>();
+        for (int i = 0; i < belgeler.size(); i++) adlar.add(belgeler.get(i).getFileName().toString());
+        if (adlar.isEmpty()) adlar.add(hedef.getFileName().toString());
+        List<String> bedeller = f.sozlesmeler.stream().flatMap(g -> g.bedeller.stream()).map(Bedel::metin)
+                .filter(s -> !s.isBlank()).toList();
+        try {
+            IslemGunlugu.varsayilan().ekle(adlar, f.formTuru, f.logoIcinSirketler(), bedeller);
+        } catch (Exception e) {
+            durum("Uyarı: işlem günlüğü yazılamadı — " + e.getMessage());
+        }
+    }
+
+    /**
+     * .docx → PDF (arka planda). Oluşan PDF hedefPdf'e taşınır.
+     * @param saklanacakDocx PDF ile birlikte kalacak Word dosyası (null: Word dosyası saklanmaz)
+     * @param geciciKlasor   işlem sonunda silinecek geçici klasör (null: yok)
+     */
+    private void pdfeCevir(Path docx, Path hedefPdf, Path saklanacakDocx, Path geciciKlasor) {
+        ciktiDugmeleri(false);
+        durum("PDF oluşturuluyor (Word arka planda açılıyor, birkaç saniye sürebilir)…");
+        new SwingWorker<Path, Void>() {
+            @Override protected Path doInBackground() throws Exception {
+                var sonuc = legal.erk.yobf.render.PdfDonusturucu.donustur(docx);
+                if (sonuc.isEmpty()) return null;
+                Path pdf = sonuc.get().pdf();
+                if (!pdf.toAbsolutePath().equals(hedefPdf.toAbsolutePath())) {
+                    Files.move(pdf, hedefPdf, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                if (saklanacakDocx != null && !saklanacakDocx.toAbsolutePath().equals(docx.toAbsolutePath())) {
+                    Files.copy(docx, saklanacakDocx, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                return hedefPdf;
             }
 
             @Override protected void done() {
-                wordOlustur.setEnabled(true);
+                ciktiDugmeleri(true);
                 try {
-                    var sonuc = get();
-                    if (sonuc.isEmpty()) {
-                        durum("PDF oluşturulamadı: Word veya LibreOffice bulunamadı.");
-                        JOptionPane.showMessageDialog(AnaPencere.this, "Word belgesi oluşturuldu:\n" + docx
-                                + "\n\nPDF için bilgisayarda Microsoft Word veya LibreOffice bulunamadı.\n"
-                                + "PDF'i Word'de 'Farklı Kaydet → PDF' ile alabilirsiniz.", "PDF", JOptionPane.WARNING_MESSAGE);
+                    Path pdf = get();
+                    if (pdf == null) {
+                        pdfYapilamadi("bilgisayarda Microsoft Word veya LibreOffice bulunamadı.", docx, hedefPdf, saklanacakDocx);
                         return;
                     }
-                    Path pdf = sonuc.get().pdf();
-                    durum("Kaydedildi: " + docx.getFileName() + " ve " + pdf.getFileName());
-                    Object[] secenekler = {"PDF'i aç", "Word'ü aç", "Kapat"};
-                    int s = JOptionPane.showOptionDialog(AnaPencere.this, "Form oluşturuldu:\n" + docx + "\n" + pdf,
-                            "Tamamlandı", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, secenekler, secenekler[0]);
+                    durum("Kaydedildi: " + pdf + (saklanacakDocx != null ? " (+ " + saklanacakDocx.getFileName() + ")" : ""));
+                    Object[] secenekler = saklanacakDocx != null
+                            ? new Object[]{"PDF'i aç", "Word'ü aç", "Kapat"} : new Object[]{"PDF'i aç", "Kapat"};
+                    int s = JOptionPane.showOptionDialog(AnaPencere.this, "Form oluşturuldu:\n" + pdf
+                                    + (saklanacakDocx != null ? "\n" + saklanacakDocx : ""), "Tamamlandı",
+                            JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, secenekler, secenekler[0]);
                     if (s == 0) ac(pdf);
-                    else if (s == 1) ac(docx);
+                    else if (s == 1 && saklanacakDocx != null) ac(saklanacakDocx);
                 } catch (ExecutionException e) {
-                    durum("PDF oluşturulamadı: " + e.getCause().getMessage());
-                    JOptionPane.showMessageDialog(AnaPencere.this, "Word belgesi oluşturuldu ama PDF'e çevrilemedi:\n"
-                            + e.getCause().getMessage(), "PDF", JOptionPane.WARNING_MESSAGE);
+                    pdfYapilamadi(e.getCause().getMessage(), docx, hedefPdf, saklanacakDocx);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                } finally {
+                    if (geciciKlasor != null) sil(geciciKlasor);
                 }
             }
         }.execute();
+    }
+
+    /** PDF'e çevrilemedi: Word dosyası kaydedilmediyse kaydetmeyi önerir. */
+    private void pdfYapilamadi(String neden, Path docx, Path hedefPdf, Path saklanacakDocx) {
+        durum("PDF oluşturulamadı: " + neden);
+        boolean wordVar = saklanacakDocx != null && Files.exists(saklanacakDocx);
+        if (wordVar) {
+            JOptionPane.showMessageDialog(this, "Word belgesi kaydedildi:\n" + saklanacakDocx + "\n\nPDF oluşturulamadı: " + neden
+                    + "\nPDF'i Word'de 'Farklı Kaydet → PDF' ile alabilirsiniz.", "PDF", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        Path yedek = PdfDonusturucuYardim.docxYolu(hedefPdf);
+        if (JOptionPane.showConfirmDialog(this, "PDF oluşturulamadı: " + neden
+                        + "\n\nForm Word (.docx) olarak kaydedilsin mi?\n" + yedek, "PDF",
+                JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION) {
+            try {
+                Files.copy(docx, yedek, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                durum("Word olarak kaydedildi: " + yedek);
+                ac(yedek);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Kaydedilemedi: " + e.getMessage(), "Hata", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private static void sil(Path klasor) {
+        try (var s = Files.walk(klasor)) {
+            s.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try { Files.deleteIfExists(p); } catch (Exception ignored) { /* geçici dosya */ }
+            });
+        } catch (Exception ignored) {
+            // geçici klasör silinemezse sistem temizler
+        }
     }
 
     private void anahtarGir() {

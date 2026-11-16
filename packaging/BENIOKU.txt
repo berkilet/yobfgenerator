@@ -23,8 +23,9 @@ Model
 
 Önizleme ve PDF
   Sağdaki "Önizleme" sekmesi formun yaklaşık görünümünü gösterir (tıklayınca büyür).
-  "Onayla ve Word Oluştur" penceresinde "PDF olarak da kaydet" işaretlenirse PDF,
-  bilgisayardaki Microsoft Word ile (yoksa LibreOffice ile) .docx'in yanına kaydedilir.
+  "Onayla ve PDF Oluştur" düğmesi (veya Dosya > PDF Olarak Oluştur) formu doğrudan PDF
+  olarak kaydeder; dönüştürme bilgisayardaki Microsoft Word ile (yoksa LibreOffice ile)
+  yapılır. İstenirse Word (.docx) dosyası da yanına kaydedilir.
 
 Kurumsal proxy
   config\ayarlar.json → "proxy": { "host": "proxy.sirket.local", "port": 8080 }
