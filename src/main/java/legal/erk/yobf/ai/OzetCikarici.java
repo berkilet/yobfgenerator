@@ -1,89 +1,55 @@
 package legal.erk.yobf.ai;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.anthropic.errors.AnthropicServiceException;
-import com.anthropic.errors.UnauthorizedException;
-import com.anthropic.errors.BadRequestException;
-import com.anthropic.errors.AnthropicIoException;
-import com.anthropic.errors.RateLimitException;
-import com.anthropic.models.beta.messages.BetaStopReason;
-import com.anthropic.models.beta.messages.MessageCreateParams;
-import com.anthropic.models.beta.messages.StructuredMessage;
-import com.anthropic.models.beta.messages.StructuredMessageCreateParams;
 import legal.erk.yobf.config.Ayarlar;
 import legal.erk.yobf.extract.BelgeOkuyucu.Belge;
 import legal.erk.yobf.rules.KarakterSayaci;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * Claude ile yapılandırılmış özet çıkarımı (CLAUDE.md §7).
- * Model adı ayarlar.json'dan, sistem talimatı prompts/ozet_prompt.md'den okunur.
- * Yapılandırılmış çıktı (output_config.format / JSON şeması) kullanılır; dönen nesne şemaya uyar.
+ * Belgelerden yapılandırılmış özet çıkarımı (CLAUDE.md §7) — sağlayıcıdan bağımsız.
+ * Sistem talimatı prompts/ozet_prompt.md'den okunur; istek seçili ModelIstemcisi ile gönderilir
+ * (Anthropic, OpenAI, Gemini veya OpenAI uyumlu servis).
  */
-public final class ClaudeIstemci implements AutoCloseable {
+public final class OzetCikarici implements AutoCloseable {
 
     /** Uzun belge eşiği (§7): bunun üzerindeki belgelerden yalnızca ilgili sayfalar gönderilir. */
     static final int UZUN_BELGE_SAYFA = 150;
     private static final int BAS_SAYFA = 25;
     private static final int SON_SAYFA = 10;
     private static final int ANAHTAR_SAYFA_MAX = 40;
-    private static final String YEDEK_MODEL_BETA = "server-side-fallback-2026-07-01";
 
     private final Ayarlar ayarlar;
-    private final Ayarlar.ModelSecenegi model;
     private final String sistemTalimati;
-    private final AnthropicClient client;
+    private final ModelIstemcisi istemci;
 
-    public ClaudeIstemci(Ayarlar ayarlar, Path promptDosyasi, String apiAnahtari) throws IOException {
-        this(ayarlar, ayarlar.model(), promptDosyasi, apiAnahtari);
-    }
-
-    /** @param modelId arayüzde seçilen model (ayarlar.json → modeller) */
-    public ClaudeIstemci(Ayarlar ayarlar, String modelId, Path promptDosyasi, String apiAnahtari) throws IOException {
+    public OzetCikarici(Ayarlar ayarlar, Path promptDosyasi, ModelIstemcisi istemci) throws IOException {
         this.ayarlar = ayarlar;
-        this.model = ayarlar.modelSecenegi(modelId == null || modelId.isBlank() ? ayarlar.model() : modelId);
+        this.istemci = istemci;
         this.sistemTalimati = Files.readString(promptDosyasi, StandardCharsets.UTF_8)
                 .replace("{{KONU_MAX}}", String.valueOf(ayarlar.konuMaxKarakter()));
-        AnthropicOkHttpClient.Builder b = AnthropicOkHttpClient.builder()
-                .apiKey(apiAnahtari)
-                .timeout(Duration.ofMinutes(5))
-                .maxRetries(3);
-        if (ayarlar.proxy().tanimli()) {
-            b.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(ayarlar.proxy().host(), ayarlar.proxy().port())));
-        }
-        this.client = b.build();
-    }
-
-    public static class ModelHatasi extends Exception {
-        public ModelHatasi(String m, Throwable t) { super(m, t); }
-        public ModelHatasi(String m) { super(m); }
     }
 
     /** Özet + kısaltma denemeleri. ilerleme: arayüzde durum çubuğu için. */
     public OzetSemasi ozetCikar(List<Belge> maskeliBelgeler, boolean ikiDilli, Consumer<String> ilerleme) throws ModelHatasi {
-        ilerleme.accept("Model çağrılıyor (" + model + ")…");
-        OzetSemasi o = cagir(OzetSemasi.class, kullaniciMesaji(maskeliBelgeler, ikiDilli), 16000);
+        ilerleme.accept("Model çağrılıyor (" + istemci.etiket() + ")…");
+        OzetSemasi o = istemci.yapilandirilmis(OzetSemasi.class, sistemTalimati, kullaniciMesaji(maskeliBelgeler, ikiDilli), 16000);
 
         int sinir = ayarlar.konuMaxKarakter();
         for (int deneme = 1; deneme <= ayarlar.kisaltmaDenemeSayisi() && KarakterSayaci.say(o.konuTr()) > sinir; deneme++) {
             ilerleme.accept("Konu " + KarakterSayaci.say(o.konuTr()) + " karakter; kısaltılıyor (" + deneme + "/"
                     + ayarlar.kisaltmaDenemeSayisi() + ")…");
-            OzetSemasi.Kisaltma k = cagir(OzetSemasi.Kisaltma.class, kisaltmaMesaji(o, ikiDilli), 4000);
+            OzetSemasi.Kisaltma k = istemci.yapilandirilmis(OzetSemasi.Kisaltma.class, sistemTalimati,
+                    kisaltmaMesaji(o, ikiDilli), 4000);
             o = new OzetSemasi(o.belgeTuru(), o.formTuruOnerisi(), o.taraflar(),
                     k.konuTr() == null || k.konuTr().isBlank() ? o.konuTr() : k.konuTr(),
                     ikiDilli && k.konuEn() != null && !k.konuEn().isBlank() ? k.konuEn() : o.konuEn(),
@@ -91,52 +57,6 @@ public final class ClaudeIstemci implements AutoCloseable {
                     o.belgeler(), o.cokluBelgeIliskisi());
         }
         return o;
-    }
-
-    private <T> T cagir(Class<T> tur, String kullaniciMesaji, long maxTokens) throws ModelHatasi {
-        StructuredMessageCreateParams<T> params = istek(tur, kullaniciMesaji, maxTokens);
-        try {
-            StructuredMessage<T> m = client.beta().messages().create(params);
-            BetaStopReason sr = m.stopReason().orElse(null);
-            if (BetaStopReason.REFUSAL.equals(sr)) {
-                throw new ModelHatasi("Model isteği reddetti (refusal). Belge içeriğini kontrol edip tekrar deneyin.");
-            }
-            if (BetaStopReason.MAX_TOKENS.equals(sr)) {
-                throw new ModelHatasi("Model yanıtı token sınırında kesildi; belge çok uzun olabilir.");
-            }
-            return m.content().stream()
-                    .flatMap(c -> c.text().stream())
-                    .map(t -> t.text())
-                    .findFirst()
-                    .orElseThrow(() -> new ModelHatasi("Modelden yapılandırılmış yanıt alınamadı."));
-        } catch (UnauthorizedException e) {
-            throw new ModelHatasi("API anahtarı geçersiz veya yetkisiz (401). Ayarlar > API Anahtarı.", e);
-        } catch (RateLimitException e) {
-            throw new ModelHatasi("Hız sınırına takıldı (429). Bir süre sonra tekrar deneyin.", e);
-        } catch (BadRequestException e) {
-            throw new ModelHatasi("İstek reddedildi (400): " + e.getMessage(), e);
-        } catch (AnthropicIoException e) {
-            throw new ModelHatasi("Ağ bağlantısı kurulamadı. İnternet/proxy ayarlarını kontrol edin: " + e.getMessage(), e);
-        } catch (AnthropicServiceException e) {
-            throw new ModelHatasi("API hatası (" + e.statusCode() + "): " + e.getMessage(), e);
-        } catch (ModelHatasi e) {
-            throw e;
-        } catch (RuntimeException e) {
-            throw new ModelHatasi("Bağlantı/yanıt hatası: " + e.getMessage(), e);
-        }
-    }
-
-    /** İstek gövdesi. Sunucu tarafı yedek model yalnızca destekleyen modellerde istenir (Haiku 5.5'te yok). */
-    <T> StructuredMessageCreateParams<T> istek(Class<T> tur, String kullaniciMesaji, long maxTokens) {
-        MessageCreateParams.Builder b = MessageCreateParams.builder()
-                .model(model.id())
-                .maxTokens(maxTokens)
-                .system(sistemTalimati)
-                .addUserMessage(kullaniciMesaji);
-        if (ayarlar.sunucuTarafiYedekModel() && model.yedekModel()) {
-            b.addBeta(YEDEK_MODEL_BETA).fallbacksDefault();
-        }
-        return b.outputConfig(tur).build();
     }
 
     String kullaniciMesaji(List<Belge> belgeler, boolean ikiDilli) {
@@ -200,10 +120,10 @@ public final class ClaudeIstemci implements AutoCloseable {
                 + (ikiDilli && o.konuEn() != null ? "\n\nkonu_en:\n" + o.konuEn() : "");
     }
 
-    public Optional<String> model() { return Optional.ofNullable(model.id()); }
+    public String etiket() { return istemci.etiket(); }
 
     @Override
     public void close() {
-        client.close();
+        istemci.close();
     }
 }

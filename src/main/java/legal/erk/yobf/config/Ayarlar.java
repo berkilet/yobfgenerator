@@ -25,7 +25,8 @@ public record Ayarlar(
         @JsonProperty("imzaya_sunan_varsayilan") String imzayaSunanVarsayilan,
         @JsonProperty("imza_blogu") ImzaBlogu imzaBlogu,
         @JsonProperty("departman_on_ayarlari") Map<String, DepartmanOnAyari> departmanOnAyarlari,
-        @JsonProperty("sunucu_tarafi_yedek_model") Boolean sunucuTarafiYedekModel) {
+        @JsonProperty("sunucu_tarafi_yedek_model") Boolean sunucuTarafiYedekModel,
+        @JsonProperty("saglayicilar") Map<String, SaglayiciAyari> saglayicilar) {
 
     public Ayarlar {
         if (konuMaxKarakter <= 0) konuMaxKarakter = 400;
@@ -42,11 +43,35 @@ public record Ayarlar(
         // Model bir isteği reddederse (stop_reason=refusal) sunucu tarafında yedek modele geçilir.
         if (sunucuTarafiYedekModel == null) sunucuTarafiYedekModel = true;
         if (model == null || model.isBlank()) model = "claude-haiku-5-5";
+        saglayicilar = saglayicilar == null ? Map.of() : new LinkedHashMap<>(saglayicilar);
         if (modeller == null || modeller.isEmpty()) {
             modeller = List.of(new ModelSecenegi(model, model, sunucuTarafiYedekModel));
         } else {
             modeller = List.copyOf(modeller);
         }
+    }
+
+    /** Anthropic dışındaki bir sağlayıcının model listesi ve (uyumlu servis için) varsayılan API adresi. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SaglayiciAyari(
+            @JsonProperty("modeller") List<ModelSecenegi> modeller,
+            @JsonProperty("taban_adres") String tabanAdres) {
+        public SaglayiciAyari {
+            modeller = modeller == null ? List.of() : List.copyOf(modeller);
+            if (tabanAdres == null) tabanAdres = "";
+        }
+    }
+
+    /** Sağlayıcı koduna göre model listesi ("anthropic" → üstteki modeller). */
+    public List<ModelSecenegi> modeller(String saglayiciKodu) {
+        if ("anthropic".equals(saglayiciKodu)) return modeller;
+        SaglayiciAyari s = saglayicilar.get(saglayiciKodu);
+        return s == null ? List.of() : s.modeller();
+    }
+
+    public String tabanAdres(String saglayiciKodu) {
+        SaglayiciAyari s = saglayicilar.get(saglayiciKodu);
+        return s == null ? "" : s.tabanAdres();
     }
 
     /** Çoklu belgede grup başlığı biçimi ve arayüzdeki hazır seçenekler. */

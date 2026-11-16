@@ -4,6 +4,29 @@
     { "id": "claude-haiku-5-5",  "ad": "Haiku 5.5 — ekonomik",     "yedek_model": false },
     { "id": "claude-sonnet-5-5", "ad": "Sonnet 5.5 — daha güçlü", "yedek_model": true }
   ],
+
+  "_saglayicilar_aciklama": "Anthropic dışındaki sağlayıcıların model listeleri (arayüzde model adı elle de yazılabilir). Üstteki 'modeller' listesi Anthropic içindir. API anahtarları burada DEĞİL, uygulamada ☰ › Yapay zekâ ayarları ile girilir.",
+  "saglayicilar": {
+    "openai": {
+      "modeller": [
+        { "id": "gpt-5-mini", "ad": "GPT-5 mini — ekonomik" },
+        { "id": "gpt-5",      "ad": "GPT-5 — daha güçlü" }
+      ]
+    },
+    "gemini": {
+      "modeller": [
+        { "id": "gemini-2.5-flash", "ad": "Gemini 2.5 Flash — ekonomik" },
+        { "id": "gemini-2.5-pro",   "ad": "Gemini 2.5 Pro — daha güçlü" }
+      ]
+    },
+    "uyumlu": {
+      "taban_adres": "https://api.mistral.ai/v1",
+      "modeller": [
+        { "id": "mistral-large-latest", "ad": "Mistral Large" },
+        { "id": "mistral-small-latest", "ad": "Mistral Small — ekonomik" }
+      ]
+    }
+  },
   "konu_max_karakter": 400,
 
   "coklu_belge": {

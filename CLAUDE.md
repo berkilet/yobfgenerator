@@ -15,12 +15,12 @@ Referans formlar: `ornekler/` klasöründeki üç PDF (toplam 14 form). Üretile
 | Arayüz | Swing + FlatLaf (+ `flatlaf-extras` SVG simgeler, `flatlaf-fonts-inter`) | jlink ile küçük imaj, ek runtime yok. Modern tasarım: lacivert üst bant + adım göstergesi, kart tabanlı düzen (`ui/Kart`), açık/koyu tema (`ui/Tema`), `JOptionPane` yerine `ui/Diyalog`, kısa mesajlar için `ui/Bildirim` |
 | PDF okuma | Apache PDFBox 3.x | Metin katmanı yoksa kullanıcıya "taranmış belge" uyarısı ver (OCR v1'de kapsam dışı) |
 | Word okuma/yazma | Apache POI 5.x (XWPF) | .docx girdi + çıktı |
-| Yapay zekâ | Anthropic resmi Java SDK (`com.anthropic:anthropic-java`) | Model adı `config/ayarlar.json` içinden okunur, koda gömülmez. Varsayılan `claude-haiku-5-5` (ekonomik); `modeller` listesindekiler arayüzden seçilir. Sunucu tarafı yedek model (`fallbacks`) yalnızca `yedek_model: true` olan modellerde gönderilir (Haiku 5.5 desteklemez). |
+| Yapay zekâ | Çoklu sağlayıcı (`ai/ModelIstemcisi`): Anthropic resmi Java SDK (`com.anthropic:anthropic-java`, varsayılan), OpenAI, Google Gemini ve OpenAI uyumlu servisler (Mistral, DeepSeek, Groq, yerel Ollama …; Java `HttpClient` ile REST) | Kullanıcı ☰ › Yapay zekâ ayarları'ndan sağlayıcı, model ve anahtar seçer (`ui/YapayZekaAyarlari`). Model listeleri `config/ayarlar.json` (`modeller` = Anthropic, `saglayicilar.openai/gemini/uyumlu`), koda gömülmez; model adı elle de yazılabilir. Varsayılan `claude-haiku-5-5`. Üç sağlayıcı da aynı katı JSON şemasını kullanır (`ai/JsonSema`, SDK'nın ürettiği şema); şema desteklemeyen uyumlu servislerde JSON modu + şema talimatına düşülür. Anthropic'te sunucu tarafı yedek model (`fallbacks`) yalnızca `yedek_model: true` olan modellerde. |
 | JSON | Jackson | |
 | Paketleme | `jlink` + `jpackage --type app-image` | Çıktı: içinde runtime ve `.exe` bulunan klasör → zip. **Kurulum ve yönetici yetkisi gerektirmez.** |
 | CI | GitHub Actions `windows-latest` | jpackage çapraz derleme yapmadığı için Windows paketi burada üretilir |
 
-API anahtarı: `config/ayarlar.json` dışında, kullanıcı profilinde (`%APPDATA%\YOBF\anahtar.txt`) veya `ANTHROPIC_API_KEY` ortam değişkeninde tutulur. Asla koda veya repoya yazılmaz. Kurumsal proxy ayarı (`https.proxyHost/Port`) ayarlar dosyasından okunabilmelidir.
+API anahtarları: `config/ayarlar.json` dışında, kullanıcı profilinde sağlayıcı başına ayrı dosyada (`%APPDATA%\YOBF\anahtar.txt` Anthropic, `anahtar-openai.txt`, `anahtar-gemini.txt`, `anahtar-uyumlu.txt`) veya ortam değişkeninde (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`) tutulur. Asla koda veya repoya yazılmaz. Kurumsal proxy ayarı (`https.proxyHost/Port`) ayarlar dosyasından okunabilmelidir.
 
 ---
 
@@ -128,7 +128,8 @@ Form altındaki **UYGUNDUR** bloğu:
 
 ## 7. Model çağrısı
 
-- Sistem talimatı: `prompts/ozet_prompt.md` (dosyadan okunur; uygulamayı yeniden derlemeden düzenlenebilir).
+- Sistem talimatı: `prompts/ozet_prompt.md` (dosyadan okunur; uygulamayı yeniden derlemeden düzenlenebilir). Tüm sağlayıcılarda aynı talimat ve şema kullanılır (`ai/OzetCikarici`).
+- Performans: model çağrısı ve belge okuma arka planda; kaynak metnin doğrulama için hazırlanması (`Dogrulayici.Kaynak`) analizde bir kez yapılır, canlı doğrulama yazarken kısa duraksamadan sonra çalışır.
 - Yapılandırılmış çıktı için tool use / JSON şeması zorunlu tutulur. Dönen şema:
 
 ```json
@@ -183,7 +184,7 @@ yobf-otomator/
    ├─ App.java
    ├─ ui/        (AnaPencere, DuzenlemePaneli, ImzaciPaneli)
    ├─ extract/   (PdfMetin, DocxMetin, Maskeleme)
-   ├─ ai/        (ClaudeIstemci, OzetSemasi)
+   ├─ ai/        (OzetCikarici, OzetSemasi, ModelIstemcisi + AnthropicIstemcisi / OpenAiIstemcisi / GeminiIstemcisi, JsonSema, Saglayici)
    ├─ rules/     (LogoCozumleyici, UnvanNormalizer, KarakterSayaci, Dogrulayici)
    ├─ render/    (FormYazici — POI)
    └─ log/       (IslemGunlugu)

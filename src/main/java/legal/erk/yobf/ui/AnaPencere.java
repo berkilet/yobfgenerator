@@ -1,7 +1,9 @@
 package legal.erk.yobf.ui;
 
 import legal.erk.yobf.ai.ApiAnahtari;
-import legal.erk.yobf.ai.ClaudeIstemci;
+import legal.erk.yobf.ai.IstemciFabrikasi;
+import legal.erk.yobf.ai.OzetCikarici;
+import legal.erk.yobf.ai.Saglayici;
 import legal.erk.yobf.ai.OzetSemasi;
 import legal.erk.yobf.config.UygulamaYolu;
 import legal.erk.yobf.config.Yapilandirma;
@@ -64,7 +66,9 @@ public class AnaPencere extends JFrame {
     private final JButton wordOlustur = new JButton("Onayla ve Word Oluştur…");
     private final JButton pdfOlusturBtn = new JButton("Onayla ve PDF Oluştur…");
     private final JComboBox<String> formTuruTercihi = new JComboBox<>();
-    private final JComboBox<legal.erk.yobf.config.Ayarlar.ModelSecenegi> modelSecici = new JComboBox<>();
+    private final JComboBox<Object> modelSecici = new JComboBox<>();
+    private final JComboBox<Saglayici> saglayiciSecici = new JComboBox<>(Saglayici.values());
+    private boolean modelDolduruluyor;
     private final legal.erk.yobf.config.Tercihler tercihler = legal.erk.yobf.config.Tercihler.varsayilan();
     private OnizlemePaneli onizleme;
     private final javax.swing.Timer onizlemeZamanlayici = new javax.swing.Timer(300, e -> onizlemeGuncelle());
@@ -135,8 +139,9 @@ public class AnaPencere extends JFrame {
 
         bosForm();
         adim(1);
-        if (ApiAnahtari.oku().isEmpty()) {
-            durum("API anahtarı tanımlı değil — ☰ menü › Ayarlar › API Anahtarı… (formu elle de doldurabilirsiniz)");
+        Saglayici bas = secilenSaglayici();
+        if (bas != Saglayici.UYUMLU && ApiAnahtari.oku(bas).isEmpty()) {
+            durum(bas.ad + " API anahtarı tanımlı değil — ☰ › Yapay zekâ ayarları (formu elle de doldurabilirsiniz)");
         }
     }
 
@@ -282,17 +287,27 @@ public class AnaPencere extends JFrame {
 
         formTuruTercihi.addItem("Form türü: otomatik");
         y.ayarlar().formTurleri().forEach(f -> formTuruTercihi.addItem(f.kod()));
-        y.ayarlar().modeller().forEach(modelSecici::addItem);
-        String kayitli = tercihler.model(y.ayarlar().model());
-        for (int i = 0; i < modelSecici.getItemCount(); i++) {
-            if (modelSecici.getItemAt(i).id().equals(kayitli)) modelSecici.setSelectedIndex(i);
-        }
-        modelSecici.setToolTipText("Analizde kullanılacak yapay zekâ modeli (Haiku: en ucuz)");
-        modelSecici.addActionListener(e -> {
-            if (modelSecici.getSelectedItem() instanceof legal.erk.yobf.config.Ayarlar.ModelSecenegi ms) {
-                tercihler.modelAyarla(ms.id());
+        saglayiciSecici.setSelectedItem(Saglayici.kodla(tercihler.saglayici()));
+        saglayiciSecici.setToolTipText("Yapay zekâ sağlayıcısı — anahtarlar: ☰ › Yapay zekâ ayarları");
+        saglayiciSecici.addActionListener(e -> {
+            if (modelDolduruluyor) return;
+            Saglayici s = secilenSaglayici();
+            tercihler.saglayiciAyarla(s.kod);
+            modelleriDoldur();
+            if (s != Saglayici.UYUMLU && ApiAnahtari.oku(s).isEmpty()) {
+                durum(s.ad + " için API anahtarı girilmemiş — ☰ › Yapay zekâ ayarları");
+            } else {
+                durum("Sağlayıcı: " + s.ad);
             }
         });
+        modelSecici.setEditable(true);
+        modelSecici.setToolTipText("Analizde kullanılacak model — listeden seçin veya model adını yazın");
+        modelSecici.addActionListener(e -> {
+            if (modelDolduruluyor) return;
+            String m = secilenModel();
+            if (!m.isBlank()) tercihler.modelAyarla(secilenSaglayici().kod, m);
+        });
+        modelleriDoldur();
         analizEt.addActionListener(e -> analizEt());
         analizIlerleme.setIndeterminate(true);
         analizIlerleme.setVisible(false);
@@ -304,6 +319,7 @@ public class AnaPencere extends JFrame {
         c.insets = new java.awt.Insets(0, 0, 0, 8);
         c.anchor = java.awt.GridBagConstraints.WEST;
         kontroller.add(formTuruTercihi, c);
+        kontroller.add(saglayiciSecici, c);
         kontroller.add(modelSecici, c);
         c.weightx = 1;
         c.fill = java.awt.GridBagConstraints.HORIZONTAL;
@@ -330,6 +346,59 @@ public class AnaPencere extends JFrame {
         k.setTransferHandler(th);
         etiketleriYenile();
         return k;
+    }
+
+    private Saglayici secilenSaglayici() {
+        Object o = saglayiciSecici.getSelectedItem();
+        return o instanceof Saglayici s ? s : Saglayici.ANTHROPIC;
+    }
+
+    /** Seçili/yazılı model kimliği (listedeki seçeneğin görünen adı yazılıysa kimliğe çevrilir). */
+    private String secilenModel() {
+        Object o = modelSecici.getEditor().getItem();
+        if (o instanceof legal.erk.yobf.config.Ayarlar.ModelSecenegi m) return m.id();
+        String t = o == null ? "" : o.toString().trim();
+        for (int i = 0; i < modelSecici.getItemCount(); i++) {
+            if (modelSecici.getItemAt(i) instanceof legal.erk.yobf.config.Ayarlar.ModelSecenegi m && m.toString().equals(t)) {
+                return m.id();
+            }
+        }
+        return t;
+    }
+
+    /** Seçili sağlayıcının modellerini listeler ve son kullanılan modeli seçer. */
+    private void modelleriDoldur() {
+        modelDolduruluyor = true;
+        try {
+            Saglayici s = secilenSaglayici();
+            var liste = y.ayarlar().modeller(s.kod);
+            modelSecici.removeAllItems();
+            liste.forEach(modelSecici::addItem);
+            String varsayilan = s == Saglayici.ANTHROPIC ? y.ayarlar().model() : liste.isEmpty() ? "" : liste.get(0).id();
+            String kayitli = tercihler.model(s.kod, varsayilan);
+            boolean bulundu = false;
+            for (int i = 0; i < modelSecici.getItemCount(); i++) {
+                if (modelSecici.getItemAt(i) instanceof legal.erk.yobf.config.Ayarlar.ModelSecenegi m && m.id().equals(kayitli)) {
+                    modelSecici.setSelectedIndex(i);
+                    bulundu = true;
+                }
+            }
+            if (!bulundu) modelSecici.setSelectedItem(kayitli);
+        } finally {
+            modelDolduruluyor = false;
+        }
+    }
+
+    /** Yapay zekâ ayarları penceresi; kaydedilirse seçimler yenilenir. */
+    private void ayarlariAc(Saglayici odak) {
+        if (YapayZekaAyarlari.goster(this, y.ayarlar(), tercihler, odak)) {
+            modelDolduruluyor = true;
+            saglayiciSecici.setSelectedItem(Saglayici.kodla(tercihler.saglayici()));
+            modelDolduruluyor = false;
+            modelleriDoldur();
+            durum("Yapay zekâ ayarları kaydedildi — sağlayıcı: " + secilenSaglayici().ad);
+            Bildirim.goster(this, Diyalog.Tur.BASARI, "Yapay zekâ ayarları kaydedildi", "Sağlayıcı: " + secilenSaglayici().ad);
+        }
     }
 
     /** Eklenen belgeleri kaldırılabilir "etiket"ler olarak gösterir. */
@@ -425,8 +494,8 @@ public class AnaPencere extends JFrame {
         pdfMenu.addActionListener(e -> olustur(true));
         JMenuItem gunluk = new JMenuItem("İşlem günlüğünü aç");
         gunluk.addActionListener(e -> ac(IslemGunlugu.varsayilan().dosya()));
-        JMenuItem anahtar = new JMenuItem("API anahtarı…");
-        anahtar.addActionListener(e -> anahtarGir());
+        JMenuItem anahtar = new JMenuItem("Yapay zekâ ayarları…", Simgeler.al("analiz", 16));
+        anahtar.addActionListener(e -> ayarlariAc(null));
         JMenuItem yenile = new JMenuItem("Yapılandırmayı yeniden yükle");
         yenile.addActionListener(e -> yapilandirmayiYenile());
         JMenuItem klasor = new JMenuItem("Uygulama klasörünü aç");
@@ -434,9 +503,9 @@ public class AnaPencere extends JFrame {
         JMenuItem hakkinda = new JMenuItem("Hakkında", Simgeler.al("bilgi", 16));
         hakkinda.addActionListener(e -> Diyalog.bilgi(this, Diyalog.Tur.BILGI, "YÖBF Otomatörü",
                 "Yönetici Özet Bilgilendirme Formu hazırlama aracı.<br><br>"
-                        + "<b>Varsayılan model:</b> " + y.ayarlar().model()
+                        + "<b>Yapay zekâ:</b> " + secilenSaglayici().ad + " · " + secilenModel()
                         + "<br><b>Uygulama klasörü:</b> " + UygulamaYolu.kok()
-                        + "<br><b>API anahtarı dosyası:</b> " + ApiAnahtari.dosya()));
+                        + "<br><b>Anahtarlar:</b> " + ApiAnahtari.dosya().getParent()));
         JMenuItem cik = new JMenuItem("Çıkış");
         cik.addActionListener(e -> dispose());
         m.add(ekle);
@@ -558,18 +627,21 @@ public class AnaPencere extends JFrame {
             Bildirim.goster(this, Diyalog.Tur.BILGI, "Belge yok", "Analiz için önce en az bir PDF veya Word belgesi ekleyin.");
             return;
         }
-        String anahtar = ApiAnahtari.oku().orElse(null);
-        if (anahtar == null) {
-            anahtarGir();
-            anahtar = ApiAnahtari.oku().orElse(null);
-            if (anahtar == null) return;
+        Saglayici saglayici = secilenSaglayici();
+        String anahtar = ApiAnahtari.oku(saglayici).orElse(null);
+        if (anahtar == null && saglayici != Saglayici.UYUMLU) {
+            ayarlariAc(saglayici);
+            saglayici = secilenSaglayici();
+            anahtar = ApiAnahtari.oku(saglayici).orElse(null);
+            if (anahtar == null && saglayici != Saglayici.UYUMLU) return;
         }
+        Saglayici secSaglayici = saglayici;
+        String tabanAdres = tercihler.tabanAdres(y.ayarlar().tabanAdres("uyumlu"));
         List<Path> dosyalar = new ArrayList<>();
         for (int i = 0; i < belgeler.size(); i++) dosyalar.add(belgeler.get(i));
         String tercih = formTuruTercihi.getSelectedIndex() > 0 ? (String) formTuruTercihi.getSelectedItem() : null;
         String apiAnahtari = anahtar;
-        String modelId = modelSecici.getSelectedItem() instanceof legal.erk.yobf.config.Ayarlar.ModelSecenegi ms
-                ? ms.id() : y.ayarlar().model();
+        String modelId = secilenModel();
 
         analizEt.setEnabled(false);
         analizIlerleme.setVisible(true);
@@ -595,7 +667,8 @@ public class AnaPencere extends JFrame {
                 }
                 if (maskelenen > 0) publish(maskelenen + " kişisel veri maskelendi (modele gönderilmedi).");
                 boolean ikiDilli = "YOBF_TR_EN".equals(tercih);
-                try (ClaudeIstemci c = new ClaudeIstemci(y.ayarlar(), modelId, UygulamaYolu.prompt("ozet_prompt.md"), apiAnahtari)) {
+                try (OzetCikarici c = new OzetCikarici(y.ayarlar(), UygulamaYolu.prompt("ozet_prompt.md"),
+                        IstemciFabrikasi.olustur(y.ayarlar(), secSaglayici, modelId, apiAnahtari, tabanAdres))) {
                     OzetSemasi o = c.ozetCikar(maskeli, ikiDilli, this::publish);
                     // Uzun belgede pahalı hazırlık arka planda, bir kez
                     return new Object[]{o, new Dogrulayici.Kaynak(kaynak.toString()), dosyalar.size()};
@@ -985,31 +1058,6 @@ public class AnaPencere extends JFrame {
         }
     }
 
-    private void anahtarGir() {
-        JPasswordField pf = new JPasswordField(36);
-        pf.putClientProperty(com.formdev.flatlaf.FlatClientProperties.PLACEHOLDER_TEXT, "sk-ant-…");
-        pf.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE, "showRevealButton:true");
-        JPanel p = new JPanel(new BorderLayout(0, 8));
-        p.add(pf, BorderLayout.NORTH);
-        JLabel not = new JLabel("<html>Şuraya kaydedilir: " + ApiAnahtari.dosya()
-                + "<br>ANTHROPIC_API_KEY ortam değişkeni tanımlıysa o önceliklidir.</html>");
-        not.setForeground(Tema.ikincilYazi());
-        not.setFont(not.getFont().deriveFont(11.5f));
-        p.add(not, BorderLayout.CENTER);
-        if (Diyalog.onayla(this, Diyalog.Tur.BILGI, "API anahtarı", "Anthropic API anahtarınızı girin.",
-                p, "Vazgeç", "Kaydet")) {
-            String k = new String(pf.getPassword()).trim();
-            if (k.isEmpty()) return;
-            try {
-                ApiAnahtari.kaydet(k);
-                durum("API anahtarı kaydedildi.");
-                Bildirim.goster(this, Diyalog.Tur.BASARI, "API anahtarı kaydedildi", null);
-            } catch (Exception e) {
-                Diyalog.bilgi(this, Diyalog.Tur.HATA, "Kaydedilemedi", e.getMessage());
-            }
-        }
-    }
-
     private void yapilandirmayiYenile() {
         try {
             Yapilandirma yeni = Yapilandirma.yukle();
@@ -1024,6 +1072,7 @@ public class AnaPencere extends JFrame {
             solAkis.revalidate();
             panel.yukle(f);
             canliDogrula();
+            modelleriDoldur();
             durum("Yapılandırma yeniden yüklendi.");
             Bildirim.goster(this, Diyalog.Tur.BASARI, "Yapılandırma yeniden yüklendi", "config/ klasöründeki değişiklikler uygulandı.");
         } catch (Exception e) {

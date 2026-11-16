@@ -48,6 +48,30 @@ public final class Tercihler {
 
     public void wordDeSaklaAyarla(boolean b) { veri.put("word_de_sakla", b); kaydet(); }
 
+    /** Seçili yapay zekâ sağlayıcısı (anthropic, openai, gemini, uyumlu). */
+    public String saglayici() { return veri.path("saglayici").asText("anthropic"); }
+
+    public void saglayiciAyarla(String kod) { veri.put("saglayici", kod); kaydet(); }
+
+    /** Sağlayıcıya göre son seçilen model; Anthropic için eski "model" anahtarı. */
+    public String model(String saglayiciKodu, String varsayilan) {
+        String k = "anthropic".equals(saglayiciKodu) ? "model" : "model_" + saglayiciKodu;
+        return veri.hasNonNull(k) && !veri.get(k).asText().isBlank() ? veri.get(k).asText() : varsayilan;
+    }
+
+    public void modelAyarla(String saglayiciKodu, String model) {
+        veri.put("anthropic".equals(saglayiciKodu) ? "model" : "model_" + saglayiciKodu, model);
+        kaydet();
+    }
+
+    /** OpenAI uyumlu servis adresi. */
+    public String tabanAdres(String varsayilan) {
+        return veri.hasNonNull("taban_adres") && !veri.get("taban_adres").asText().isBlank()
+                ? veri.get("taban_adres").asText() : varsayilan;
+    }
+
+    public void tabanAdresAyarla(String adres) { veri.put("taban_adres", adres); kaydet(); }
+
     public boolean koyuTema() { return veri.path("koyu_tema").asBoolean(false); }
 
     public void koyuTemaAyarla(boolean b) { veri.put("koyu_tema", b); kaydet(); }

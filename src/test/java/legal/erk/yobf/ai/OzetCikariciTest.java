@@ -14,7 +14,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Ağ çağrısı yapmaz: şema üretimi, istek oluşturma ve uzun belge seçimi. */
-class ClaudeIstemciTest {
+class OzetCikariciTest {
 
     private final Ayarlar a = TestVerisi.yapilandirma().ayarlar();
 
@@ -42,10 +42,10 @@ class ClaudeIstemciTest {
         assertFalse(a.modelSecenegi("claude-haiku-5-5").yedekModel());
         assertTrue(a.modelSecenegi("claude-sonnet-5-5").yedekModel());
         assertFalse(a.modelSecenegi("bilinmeyen-model").yedekModel(), "listede olmayan modelde yedek kapalı");
-        try (ClaudeIstemci haiku = new ClaudeIstemci(a, "claude-haiku-5-5", Path.of("prompts/ozet_prompt.md"), "k");
-             ClaudeIstemci sonnet = new ClaudeIstemci(a, "claude-sonnet-5-5", Path.of("prompts/ozet_prompt.md"), "k")) {
-            String h = haiku.istek(OzetSemasi.class, "x", 100).rawParams()._body().toString();
-            String s = sonnet.istek(OzetSemasi.class, "x", 100).rawParams()._body().toString();
+        try (AnthropicIstemcisi haiku = new AnthropicIstemcisi(a, "claude-haiku-5-5", "k");
+             AnthropicIstemcisi sonnet = new AnthropicIstemcisi(a, "claude-sonnet-5-5", "k")) {
+            String h = haiku.istek(OzetSemasi.class, "sistem", "x", 100).rawParams()._body().toString();
+            String s = sonnet.istek(OzetSemasi.class, "sistem", "x", 100).rawParams()._body().toString();
             assertTrue(h.contains("claude-haiku-5-5"), h);
             assertTrue(h.contains("fallbacks=,"), "Haiku 5.5 isteğinde sunucu tarafı yedek model (fallbacks) boş olmalı");
             assertFalse(s.contains("fallbacks=,"), "Sonnet isteğinde fallbacks dolu olmalı");
@@ -54,7 +54,7 @@ class ClaudeIstemciTest {
 
     @Test
     void promptYerTutucuDoldurulur() throws Exception {
-        try (ClaudeIstemci c = new ClaudeIstemci(a, Path.of("prompts/ozet_prompt.md"), "test-anahtar")) {
+        try (OzetCikarici c = new OzetCikarici(a, Path.of("prompts/ozet_prompt.md"), new AnthropicIstemcisi(a, null, "test-anahtar"))) {
             String m = c.kullaniciMesaji(List.of(
                     new BelgeOkuyucu.Belge(Path.of("a.pdf"), List.of("birinci")),
                     new BelgeOkuyucu.Belge(Path.of("b.pdf"), List.of("ikinci"))), false);
@@ -68,7 +68,7 @@ class ClaudeIstemciTest {
     void uzunBelgedeSecilmisSayfalarGonderilir() {
         List<String> s = new ArrayList<>();
         for (int i = 1; i <= 300; i++) s.add("Sayfa içeriği " + i + (i == 120 ? " Sözleşme Bedeli 1.000.000 TL" : ""));
-        String m = ClaudeIstemci.secilmisMetin(new BelgeOkuyucu.Belge(Path.of("uzun.pdf"), s));
+        String m = OzetCikarici.secilmisMetin(new BelgeOkuyucu.Belge(Path.of("uzun.pdf"), s));
         assertTrue(m.contains("Sayfa içeriği 1\n"));
         assertTrue(m.contains("Sözleşme Bedeli 1.000.000 TL"));
         assertTrue(m.contains("Sayfa içeriği 300"));

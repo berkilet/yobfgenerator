@@ -16,18 +16,26 @@ public final class ApiAnahtari {
 
     private ApiAnahtari() {}
 
-    public static Path dosya() {
-        return UygulamaYolu.kullaniciKlasoru().resolve("anahtar.txt");
+    /** Anthropic anahtar dosyası (geriye uyumluluk). */
+    public static Path dosya() { return dosya(Saglayici.ANTHROPIC); }
+
+    public static Path dosya(Saglayici s) {
+        return UygulamaYolu.kullaniciKlasoru().resolve(s.anahtarDosyasi);
     }
 
-    public static Optional<String> oku() {
-        String env = System.getenv("ANTHROPIC_API_KEY");
-        if (env != null && !env.isBlank()) return Optional.of(env.trim());
-        Path d = dosya();
+    public static Optional<String> oku() { return oku(Saglayici.ANTHROPIC); }
+
+    /** Önce ortam değişkeni, sonra kullanıcı klasöründeki dosya. */
+    public static Optional<String> oku(Saglayici s) {
+        for (String ad : s.ortamDegiskenleri) {
+            String env = System.getenv(ad);
+            if (env != null && !env.isBlank()) return Optional.of(env.trim());
+        }
+        Path d = dosya(s);
         if (Files.isRegularFile(d)) {
             try {
-                String s = Files.readString(d, StandardCharsets.UTF_8).trim();
-                if (!s.isEmpty()) return Optional.of(s);
+                String k = Files.readString(d, StandardCharsets.UTF_8).trim();
+                if (!k.isEmpty()) return Optional.of(k);
             } catch (IOException ignored) {
                 // anahtar yok say
             }
@@ -35,9 +43,23 @@ public final class ApiAnahtari {
         return Optional.empty();
     }
 
-    public static void kaydet(String anahtar) throws IOException {
-        Path d = dosya();
+    /** Anahtar ortam değişkeninden mi geliyor (arayüzde bilgi için)? */
+    public static Optional<String> ortamDegiskeni(Saglayici s) {
+        return s.ortamDegiskenleri.stream().filter(a -> {
+            String e = System.getenv(a);
+            return e != null && !e.isBlank();
+        }).findFirst();
+    }
+
+    public static void kaydet(String anahtar) throws IOException { kaydet(Saglayici.ANTHROPIC, anahtar); }
+
+    public static void kaydet(Saglayici s, String anahtar) throws IOException {
+        Path d = dosya(s);
         Files.createDirectories(d.getParent());
         Files.writeString(d, anahtar.trim(), StandardCharsets.UTF_8);
+    }
+
+    public static void sil(Saglayici s) throws IOException {
+        Files.deleteIfExists(dosya(s));
     }
 }

@@ -37,8 +37,9 @@ GitHub Release'e de ekler). Zip açılıp `YOBF-Otomator.exe` çalıştırılır
 Varsayılan model `claude-haiku-5-5`; `ayarlar.json → modeller` listesindeki modeller arayüzden seçilir.
 Sağ panelde canlı önizleme vardır; onayda istenirse Word (yoksa LibreOffice) ile PDF de üretilir.
 
-API anahtarı repoda tutulmaz: `ANTHROPIC_API_KEY` ortam değişkeni veya
-`%APPDATA%\YOBF\anahtar.txt` (uygulamada *Ayarlar › API Anahtarı…*).
+Yapay zekâ sağlayıcısı uygulamada *☰ › Yapay zekâ ayarları* ile seçilir: Anthropic Claude (varsayılan),
+OpenAI, Google Gemini veya OpenAI uyumlu servis (Mistral, DeepSeek, Groq, Ollama …). API anahtarları repoda
+tutulmaz: ortam değişkeni (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`) veya `%APPDATA%\YOBF\anahtar*.txt`.
 
 `ornekler/` ve `test-belgeler/` gerçek belgeler içerdiğinden `.gitignore`'dadır.
 

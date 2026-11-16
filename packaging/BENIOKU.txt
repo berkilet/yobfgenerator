@@ -4,10 +4,12 @@ YÖBF Otomatörü
 Kurulum gerekmez. Klasörü istediğiniz yere (ör. Belgelerim) çıkarın ve
 YOBF-Otomator.exe dosyasını çalıştırın. Yönetici yetkisi gerekmez.
 
-API anahtarı
-  İlk açılışta Ayarlar > API Anahtarı… menüsünden girin. Anahtar
-  %APPDATA%\YOBF\anahtar.txt dosyasına kaydedilir (bu klasöre değil).
-  ANTHROPIC_API_KEY ortam değişkeni tanımlıysa o önceliklidir.
+Yapay zekâ sağlayıcısı ve API anahtarı
+  ☰ menü > Yapay zekâ ayarları… penceresinden Anthropic Claude, OpenAI, Google Gemini
+  veya OpenAI uyumlu bir servis (Mistral, DeepSeek, Groq, yerel Ollama …) seçilir,
+  anahtar ve model girilir; "Seçili sağlayıcıyı dene" ile bağlantı denenebilir.
+  Anahtarlar %APPDATA%\YOBF altında sağlayıcı başına ayrı dosyada saklanır (bu klasörde değil).
+  Ortam değişkenleri (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY) tanımlıysa önceliklidir.
 
 Düzenlenebilir dosyalar (uygulamayı yeniden derlemeden)
   config\ayarlar.json     model adı, konu sınırı, departmanlar, imza bloğu, proxy
