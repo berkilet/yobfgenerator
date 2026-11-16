@@ -35,6 +35,16 @@ class DuzenlemePaneliTest {
             assertEquals("Taahhütname", o.sozlesmeler.get(1).belgeTuru);
             assertEquals("{no}. Evrak ({tur}) Taraflar:", o.grupBasligi);
 
+            assertTrue(p.cokluSecenekleriGorunur(), "iki grup varken seçenekler görünür");
+
+            FormVerisi tek = new FormVerisi();
+            tek.sozlesmeler.add(new SozlesmeGrubu(List.of("Kalyon Enerji Yatırımları A.Ş.", "Bir Ltd. Şti."), List.of()));
+            p.yukle(tek);
+            assertFalse(p.cokluSecenekleriGorunur(), "tek belgede gizli");
+            tek.belgeSayisi = 2;
+            p.yukle(tek);
+            assertTrue(p.cokluSecenekleriGorunur(), "analize iki belge verildiyse görünür");
+
             f.ayniIslem = true;
             p.yukle(f);
             FormVerisi t = p.oku();

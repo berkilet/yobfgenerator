@@ -25,6 +25,8 @@ public class FormVerisi {
      * true → aynı işleme ait belgeler (ör. dilekçe + taahhütname + YK kararı), taraflar tek listede.
      */
     public boolean ayniIslem = false;
+    /** Analize verilen belge sayısı (arayüzde "birden fazla belge" seçeneklerini göstermek için). */
+    public int belgeSayisi = 0;
     /** Grup başlığı biçimi; {no} = sıra, {tur} = grubun belge türü. */
     public String grupBasligi = "{no}. {tur} Taraflar:";
     public String konuTr = "";

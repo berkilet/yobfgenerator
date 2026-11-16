@@ -31,6 +31,7 @@ public final class FormHazirlayici {
 
     public FormVerisi hazirla(OzetSemasi o, int belgeSayisi) {
         FormVerisi f = new FormVerisi();
+        f.belgeSayisi = belgeSayisi;
         f.tarih = TarihKontrol.bugun();
         f.formTuru = formTuru(o);
         f.belgeTuru = belgeTuru(o.belgeTuru(), f.formTuru);

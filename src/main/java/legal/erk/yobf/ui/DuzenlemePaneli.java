@@ -66,6 +66,9 @@ public class DuzenlemePaneli extends JPanel {
     private final javax.swing.JRadioButton ayniIslem = new javax.swing.JRadioButton("Aynı işleme ait belgeler (tek liste)");
     private final JTextField grupTurleri = new JTextField();
     private final JComboBox<String> grupBasligi;
+    /** "Birden fazla belge" seçenekleri; yalnızca birden fazla belge varken görünür. */
+    private final JPanel cokluPanel = new JPanel(new BorderLayout(0, 2));
+    private int belgeSayisi;
 
     private final JTextArea kisiler = alan(2);
     private final JTextArea sirketler = alan(4);
@@ -203,6 +206,7 @@ public class DuzenlemePaneli extends JPanel {
         logolariYukle();
         dinleyiciler();
         logoOnizlemeGuncelle();
+        cokluPanelDurumu();
         formTuruDegisti();
         konuSay();
     }
@@ -247,7 +251,7 @@ public class DuzenlemePaneli extends JPanel {
         turler.add(new JLabel("<html><small>{no} = sıra, {tur} = grubun türü (model algılar, değiştirebilirsiniz). "
                 + "Ör. \"{no}. Evrak ({tur}) Taraflar:\" → \"1. Evrak (Sözleşme) Taraflar:\"</small></html>"), c);
 
-        JPanel alt = new JPanel(new BorderLayout(0, 2));
+        JPanel alt = cokluPanel;
         alt.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
         alt.add(secim, BorderLayout.NORTH);
         alt.add(turler, BorderLayout.CENTER);
@@ -262,9 +266,9 @@ public class DuzenlemePaneli extends JPanel {
             public void changedUpdate(DocumentEvent e) { degisti.run(); }
         });
         DocumentListener tarafDegisti = new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { degisti.run(); }
-            public void removeUpdate(DocumentEvent e) { degisti.run(); }
-            public void changedUpdate(DocumentEvent e) { degisti.run(); }
+            public void insertUpdate(DocumentEvent e) { cokluPanelDurumu(); degisti.run(); }
+            public void removeUpdate(DocumentEvent e) { cokluPanelDurumu(); degisti.run(); }
+            public void changedUpdate(DocumentEvent e) { cokluPanelDurumu(); degisti.run(); }
         };
         taraflar.getDocument().addDocumentListener(tarafDegisti);
         bedeller.getDocument().addDocumentListener(tarafDegisti);
@@ -274,6 +278,25 @@ public class DuzenlemePaneli extends JPanel {
         p.add(alt, BorderLayout.SOUTH);
         return p;
     }
+
+    /**
+     * Birden fazla belge seçenekleri yalnızca gerektiğinde görünür: analize birden fazla belge verildiyse,
+     * taraflarda "---" grup ayracı varsa veya form "aynı işleme ait belgeler" olarak işaretliyse.
+     */
+    private void cokluPanelDurumu() {
+        boolean ayracVar = Arrays.stream(taraflar.getText().split("\\R"))
+                .anyMatch(s -> s.trim().equals(GRUP_AYRACI))
+                || Arrays.stream(bedeller.getText().split("\\R")).anyMatch(s -> s.trim().equals(GRUP_AYRACI));
+        boolean goster = belgeSayisi > 1 || ayracVar || ayniIslem.isSelected();
+        if (cokluPanel.isVisible() != goster) {
+            cokluPanel.setVisible(goster);
+            revalidate();
+            repaint();
+        }
+    }
+
+    /** Görünürlük testi için. */
+    boolean cokluSecenekleriGorunur() { return cokluPanel.isVisible(); }
 
     /** "Aynı işleme ait" seçiliyken grup türü ve başlık kullanılmaz. */
     private void grupAlanlariDurumu() {
@@ -563,6 +586,7 @@ public class DuzenlemePaneli extends JPanel {
             bedeller.setText(bg.stream().allMatch(String::isBlank) ? "" : String.join(ayrac, bg));
             bedelEtiketi.setSelectedItem(f.bedelEtiketi);
             (f.ayniIslem ? ayniIslem : ayriBelgeler).setSelected(true);
+            belgeSayisi = Math.max(f.belgeSayisi, f.sozlesmeler.size());
             grupTurleri.setText(String.join(", ", f.sozlesmeler.stream().map(g -> g.belgeTuru == null ? "" : g.belgeTuru).toList())
                     .replaceAll("^(, )+$", ""));
             grupBasligi.setSelectedItem(f.grupBasligi == null || f.grupBasligi.isBlank()
@@ -588,6 +612,7 @@ public class DuzenlemePaneli extends JPanel {
         }
         satirDurumlariniUygula();
         grupAlanlariDurumu();
+        cokluPanelDurumu();
         formTuruDegisti();
     }
 
@@ -602,6 +627,7 @@ public class DuzenlemePaneli extends JPanel {
         List<List<String>> tg = gruplar(taraflar.getText());
         List<List<String>> bg = gruplar(bedeller.getText());
         f.ayniIslem = ayniIslem.isSelected();
+        f.belgeSayisi = belgeSayisi;
         f.grupBasligi = metin(grupBasligi);
         if (f.ayniIslem) {
             // Aynı işleme ait belgeler: tüm gruplar tek listede, tekrarsız
