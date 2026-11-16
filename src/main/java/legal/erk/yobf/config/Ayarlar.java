@@ -13,6 +13,7 @@ public record Ayarlar(
         @JsonProperty("model") String model,
         @JsonProperty("modeller") List<ModelSecenegi> modeller,
         @JsonProperty("konu_max_karakter") int konuMaxKarakter,
+        @JsonProperty("konu_max_karakter_coklu") int konuMaxKarakterCoklu,
         @JsonProperty("coklu_belge") CokluBelge cokluBelge,
         @JsonProperty("konu_sinir_sert") boolean konuSinirSert,
         @JsonProperty("kisaltma_deneme_sayisi") int kisaltmaDenemeSayisi,
@@ -30,6 +31,9 @@ public record Ayarlar(
 
     public Ayarlar {
         if (konuMaxKarakter <= 0) konuMaxKarakter = 400;
+        // Birden fazla belgede açıklama için daha geniş alan; tek belge sınırından küçük olamaz
+        if (konuMaxKarakterCoklu <= 0) konuMaxKarakterCoklu = Math.max(600, konuMaxKarakter);
+        if (konuMaxKarakterCoklu < konuMaxKarakter) konuMaxKarakterCoklu = konuMaxKarakter;
         if (cokluBelge == null) cokluBelge = new CokluBelge(null, null);
         if (kisaltmaDenemeSayisi < 0) kisaltmaDenemeSayisi = 0;
         if (maskeleme == null) maskeleme = new Maskeleme(true, true, true, true);
@@ -72,6 +76,11 @@ public record Ayarlar(
     public String tabanAdres(String saglayiciKodu) {
         SaglayiciAyari s = saglayicilar.get(saglayiciKodu);
         return s == null ? "" : s.tabanAdres();
+    }
+
+    /** Konu karakter sınırı: tek belgede konu_max_karakter, birden fazla belgede konu_max_karakter_coklu. */
+    public int konuSiniri(boolean cokluBelge) {
+        return cokluBelge ? konuMaxKarakterCoklu : konuMaxKarakter;
     }
 
     /** Çoklu belgede grup başlığı biçimi ve arayüzdeki hazır seçenekler. */

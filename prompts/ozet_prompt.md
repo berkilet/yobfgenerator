@@ -42,6 +42,7 @@ EN: Within the scope of financing, the Board of Directors' resolution regarding 
 - `coklu_belge_iliskisi`:
   - `AYRI_BELGELER`: belgeler ayrı ayrı imzalanacak bağımsız belgeler (ör. aynı projede iki farklı yükleniciyle iki sözleşme; bir sözleşme ve bir protokol). Taraflar ve bedeller belge numarasıyla ayrılır.
   - `AYNI_ISLEM`: belgeler aynı işin/başvurunun parçaları (ör. dilekçe + taahhütname + yönetim kurulu kararı). Konu metni belgeleri birlikte anar: "… hazırlanan dilekçe, taahhütname ve yönetim kurulu kararı onay ve imzanıza sunulmaktadır."
+- Birden fazla belgede `konu_tr` sınırı daha geniştir (yukarıdaki sınır buna göre verilir). Sınır hedef değildir: belgeleri ve aralarındaki ilişkiyi açıklamaya yetecek kadar yaz, doldurmak için uzatma.
 - Tek belgede `belgeler` tek elemanlı, `coklu_belge_iliskisi` boş.
 
 ## Bedel biçimi

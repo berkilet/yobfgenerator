@@ -80,7 +80,7 @@ Logo, başlığın üstünde ortalanır; yükseklik sabit (≈ 2,2 cm), en-boy o
 - Taraf sayısı sınırsızdır (örnekte 3 taraflı VO var).
 
 ### 5.2 Konu (özet)
-- **Sınır:** varsayılan **400 karakter**, yalnızca harf ve rakam sayılır (boşluk ve noktalama hariç). Sayım deterministik olarak kodda yapılır: `\p{L}` ve `\p{N}` eşleşmeleri.
+- **Sınır:** varsayılan **400 karakter** (`ayarlar.json → konu_max_karakter`); **birden fazla belge** tek forma bağlandığında **600 karakter** (`konu_max_karakter_coklu`) — üst sınırdır, model doldurmak zorunda değildir. Yalnızca harf ve rakam sayılır (boşluk ve noktalama hariç). Sayım deterministik olarak kodda yapılır: `\p{L}` ve `\p{N}` eşleşmeleri. Geçerli sınır `Ayarlar.konuSiniri(cokluBelge)` ile bulunur (prompt, kısaltma, sayaç ve doğrulama aynı değeri kullanır).
 - Sınır aşılırsa model en fazla 2 kez "kısalt" talimatıyla yeniden çağrılır; hâlâ aşıyorsa kullanıcıya kırmızı uyarıyla gösterilir.
 - **Dikkat:** Mevcut örneklerin 3'ü bu sınırı aşıyor (Efectis 482, Aydıntepe 466, Green Diamond 546). Sınırın sert mi yumuşak mı olduğu `ayarlar.json → konu_sinir_sert` ile belirlenir.
 - Üslup (örneklerden çıkarılmıştır, `prompts/ozet_prompt.md` içinde örneklerle verilmiştir):

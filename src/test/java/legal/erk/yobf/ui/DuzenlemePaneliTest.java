@@ -44,6 +44,10 @@ class DuzenlemePaneliTest {
             tek.belgeSayisi = 2;
             p.yukle(tek);
             assertTrue(p.cokluSecenekleriGorunur(), "analize iki belge verildiyse görünür");
+            assertTrue(p.oku().cokluBelge(), "iki belgede Konu sınırı 600");
+            tek.belgeSayisi = 1;
+            p.yukle(tek);
+            assertFalse(p.oku().cokluBelge(), "tek belgede Konu sınırı 400");
 
             f.ayniIslem = true;
             p.yukle(f);

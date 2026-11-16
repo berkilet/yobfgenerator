@@ -282,7 +282,7 @@ public class DuzenlemePaneli extends JPanel {
         alt.add(secim, BorderLayout.NORTH);
         alt.add(turler, BorderLayout.CENTER);
 
-        java.awt.event.ActionListener al = e -> { grupAlanlariDurumu(); degisti.run(); };
+        java.awt.event.ActionListener al = e -> { grupAlanlariDurumu(); cokluPanelDurumu(); degisti.run(); };
         ayriBelgeler.addActionListener(al);
         ayniIslem.addActionListener(al);
         grupBasligi.addActionListener(e -> degisti.run());
@@ -310,15 +310,21 @@ public class DuzenlemePaneli extends JPanel {
      * taraflarda "---" grup ayracı varsa veya form "aynı işleme ait belgeler" olarak işaretliyse.
      */
     private void cokluPanelDurumu() {
-        boolean ayracVar = Arrays.stream(taraflar.getText().split("\\R"))
-                .anyMatch(s -> s.trim().equals(GRUP_AYRACI))
-                || Arrays.stream(bedeller.getText().split("\\R")).anyMatch(s -> s.trim().equals(GRUP_AYRACI));
-        boolean goster = belgeSayisi > 1 || ayracVar || ayniIslem.isSelected();
+        boolean goster = cokluMu();
         if (cokluPanel.isVisible() != goster) {
             cokluPanel.setVisible(goster);
             revalidate();
             repaint();
         }
+        sayaciGuncelle();
+    }
+
+    /** Form birden fazla belgeye mi dayanıyor (FormVerisi.cokluBelge ile aynı ölçüt)? */
+    private boolean cokluMu() {
+        boolean ayracVar = Arrays.stream(taraflar.getText().split("\\R"))
+                .anyMatch(s -> s.trim().equals(GRUP_AYRACI))
+                || Arrays.stream(bedeller.getText().split("\\R")).anyMatch(s -> s.trim().equals(GRUP_AYRACI));
+        return belgeSayisi > 1 || ayracVar || ayniIslem.isSelected();
     }
 
     /** Görünürlük testi için. */
@@ -554,11 +560,18 @@ public class DuzenlemePaneli extends JPanel {
     }
 
     private void konuSay() {
-        int n = KarakterSayaci.say(konuTr.getText());
-        int sinir = y.ayarlar().konuMaxKarakter();
-        konuSayac.setText(n + " / " + sinir);
-        konuSayac.setForeground(n > sinir ? new Color(0xC62828) : n > sinir * 0.9 ? new Color(0xB26A00) : UIManager.getColor("Label.foreground"));
+        sayaciGuncelle();
         degisti.run();
+    }
+
+    /** Canlı sayaç; sınır tek belgede 400, birden fazla belgede 600 (ayarlar.json). */
+    private void sayaciGuncelle() {
+        int n = KarakterSayaci.say(konuTr.getText());
+        int sinir = y.ayarlar().konuSiniri(cokluMu());
+        konuSayac.setText(n + " / " + sinir);
+        konuSayac.setToolTipText(cokluMu() ? "Birden fazla belge: sınır " + sinir + " karakter (yalnızca harf ve rakam sayılır)"
+                : "Yalnızca harf ve rakam sayılır");
+        konuSayac.setForeground(n > sinir ? new Color(0xC62828) : n > sinir * 0.9 ? new Color(0xB26A00) : UIManager.getColor("Label.foreground"));
     }
 
     private void formTuruDegisti() {

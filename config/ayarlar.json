@@ -28,6 +28,7 @@
     }
   },
   "konu_max_karakter": 400,
+  "konu_max_karakter_coklu": 600,
 
   "coklu_belge": {
     "_aciklama": "Birden fazla belge tek forma bağlandığında grup başlığı. {no}: sıra numarası, {tur}: belge türü (model algılar, kullanıcı değiştirebilir). Bedel başlığı 'Taraflar' yerine 'Bedeli' ile türetilir.",

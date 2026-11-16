@@ -61,6 +61,16 @@ class OzetCikariciTest {
             assertTrue(m.contains("=== BELGE 1: a.pdf ==="));
             assertTrue(m.contains("=== BELGE 2: b.pdf ==="));
             assertTrue(m.contains("belge_no"));
+            // Birden fazla belge: sınır 600, "hedef değil" notuyla
+            assertTrue(m.contains("konu_tr sınırı 600 karakterdir"), m);
+            assertTrue(m.contains("hedef değildir"));
+            assertTrue(c.sistemTalimati(2).contains("en fazla 600 karakter"));
+            assertFalse(c.sistemTalimati(2).contains("{{KONU_MAX}}"));
+
+            // Tek belge: sınır 400, çoklu belge notu yok
+            String tek = c.kullaniciMesaji(List.of(new BelgeOkuyucu.Belge(Path.of("a.pdf"), List.of("birinci"))), false);
+            assertFalse(tek.contains("600"));
+            assertTrue(c.sistemTalimati(1).contains("en fazla 400 karakter"));
         }
     }
 

@@ -96,7 +96,7 @@ public final class Dogrulayici {
         }
 
         // 4. Konu karakter sayımı
-        int sinir = ayarlar.konuMaxKarakter();
+        int sinir = ayarlar.konuSiniri(form.cokluBelge());
         int n = KarakterSayaci.say(form.konuTr);
         if (!form.dahil(Satirlar.KONU)) {
             // Konu forma dahil edilmedi

@@ -59,6 +59,11 @@ public class FormVerisi {
 
     public boolean dahil(String satir) { return !gizliSatirlar.contains(satir); }
 
+    /** Form birden fazla belgeye mi dayanıyor (Konu sınırı buna göre belirlenir)? */
+    public boolean cokluBelge() {
+        return belgeSayisi > 1 || sozlesmeler.size() > 1 || ayniIslem;
+    }
+
     public boolean ikiDilli() { return "YOBF_TR_EN".equals(formTuru); }
     public boolean azilname() { return "AZILNAME".equals(formTuru); }
     public boolean vekaletname() { return "VEKALETNAME".equals(formTuru); }

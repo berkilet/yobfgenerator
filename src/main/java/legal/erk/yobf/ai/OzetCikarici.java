@@ -29,27 +29,33 @@ public final class OzetCikarici implements AutoCloseable {
     private static final int ANAHTAR_SAYFA_MAX = 40;
 
     private final Ayarlar ayarlar;
-    private final String sistemTalimati;
+    /** prompts/ozet_prompt.md — {{KONU_MAX}} yer tutucusu her çağrıda geçerli sınırla doldurulur. */
+    private final String sistemSablonu;
     private final ModelIstemcisi istemci;
 
     public OzetCikarici(Ayarlar ayarlar, Path promptDosyasi, ModelIstemcisi istemci) throws IOException {
         this.ayarlar = ayarlar;
         this.istemci = istemci;
-        this.sistemTalimati = Files.readString(promptDosyasi, StandardCharsets.UTF_8)
-                .replace("{{KONU_MAX}}", String.valueOf(ayarlar.konuMaxKarakter()));
+        this.sistemSablonu = Files.readString(promptDosyasi, StandardCharsets.UTF_8);
+    }
+
+    /** Sistem talimatı; Konu sınırı belge sayısına göre (tek belge 400, birden fazla belge 600 — ayarlar.json). */
+    String sistemTalimati(int belgeSayisi) {
+        return sistemSablonu.replace("{{KONU_MAX}}", String.valueOf(ayarlar.konuSiniri(belgeSayisi > 1)));
     }
 
     /** Özet + kısaltma denemeleri. ilerleme: arayüzde durum çubuğu için. */
     public OzetSemasi ozetCikar(List<Belge> maskeliBelgeler, boolean ikiDilli, Consumer<String> ilerleme) throws ModelHatasi {
         ilerleme.accept("Model çağrılıyor (" + istemci.etiket() + ")…");
+        String sistemTalimati = sistemTalimati(maskeliBelgeler.size());
         OzetSemasi o = istemci.yapilandirilmis(OzetSemasi.class, sistemTalimati, kullaniciMesaji(maskeliBelgeler, ikiDilli), 16000);
 
-        int sinir = ayarlar.konuMaxKarakter();
+        int sinir = ayarlar.konuSiniri(maskeliBelgeler.size() > 1);
         for (int deneme = 1; deneme <= ayarlar.kisaltmaDenemeSayisi() && KarakterSayaci.say(o.konuTr()) > sinir; deneme++) {
             ilerleme.accept("Konu " + KarakterSayaci.say(o.konuTr()) + " karakter; kısaltılıyor (" + deneme + "/"
                     + ayarlar.kisaltmaDenemeSayisi() + ")…");
             OzetSemasi.Kisaltma k = istemci.yapilandirilmis(OzetSemasi.Kisaltma.class, sistemTalimati,
-                    kisaltmaMesaji(o, ikiDilli), 4000);
+                    kisaltmaMesaji(o, ikiDilli, sinir), 4000);
             o = new OzetSemasi(o.belgeTuru(), o.formTuruOnerisi(), o.taraflar(),
                     k.konuTr() == null || k.konuTr().isBlank() ? o.konuTr() : k.konuTr(),
                     ikiDilli && k.konuEn() != null && !k.konuEn().isBlank() ? k.konuEn() : o.konuEn(),
@@ -70,7 +76,10 @@ public final class OzetCikarici implements AutoCloseable {
                     .append("(ör. dilekçe + taahhütname + yönetim kurulu kararı) AYNI_ISLEM yaz.\n")
                     .append("- Her taraf ve bedel için belge_no alanına ait olduğu belgenin sıra numarasını yaz.\n")
                     .append("- konu_tr tek ve ortak olmalıdır; AYNI_ISLEM ise belgeleri birlikte an ")
-                    .append("(ör. \"… hazırlanan dilekçe, taahhütname ve yönetim kurulu kararı onay ve imzanıza sunulmaktadır.\").\n\n");
+                    .append("(ör. \"… hazırlanan dilekçe, taahhütname ve yönetim kurulu kararı onay ve imzanıza sunulmaktadır.\").\n")
+                    .append("- Birden fazla belge olduğu için konu_tr sınırı ").append(ayarlar.konuSiniri(true))
+                    .append(" karakterdir. Bu bir üst sınırdır, hedef değildir: belgeleri ve aralarındaki ilişkiyi ")
+                    .append("açıklamaya yetecek kadar yaz, sınırı doldurmak için metni uzatma.\n\n");
         } else {
             b.append("Tek belge var: belgeler listesine tek eleman (belge_no 1 ve türü) yaz, coklu_belge_iliskisi boş kalsın.\n\n");
         }
@@ -110,8 +119,7 @@ public final class OzetCikarici implements AutoCloseable {
         return b.toString();
     }
 
-    private String kisaltmaMesaji(OzetSemasi o, boolean ikiDilli) {
-        int sinir = ayarlar.konuMaxKarakter();
+    private String kisaltmaMesaji(OzetSemasi o, boolean ikiDilli, int sinir) {
         return "Aşağıdaki konu metni " + KarakterSayaci.say(o.konuTr()) + " karakter (yalnızca harf ve rakam sayılır). "
                 + "Anlamı, üslubu ve kapanış kalıbını koruyarak en fazla " + sinir + " karaktere kısalt. "
                 + "Yeni bilgi ekleme. "

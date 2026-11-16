@@ -79,6 +79,32 @@ class DogrulayiciTest {
     }
 
     @Test
+    void cokluBelgedeKonuSiniri600() {
+        assertEquals(400, y.ayarlar().konuSiniri(false));
+        assertEquals(600, y.ayarlar().konuSiniri(true));
+
+        // Tek belge: 401 karakter sınırı aşar
+        FormVerisi tek = gecerliForm();
+        tek.konuTr = "a".repeat(401);
+        assertTrue(d.dogrula(tek, KAYNAK).stream().anyMatch(x -> x.alan().equals("Konu")));
+
+        // İki ayrı belge (iki grup): 600'e kadar serbest, 601 aşar
+        FormVerisi iki = gecerliForm();
+        iki.sozlesmeler.add(new SozlesmeGrubu(List.of("Kalyon YEKA GES 5 Elektrik Üretim A.Ş."), List.of()));
+        iki.konuTr = "a".repeat(600);
+        assertTrue(d.dogrula(iki, KAYNAK).stream().noneMatch(x -> x.alan().equals("Konu")));
+        iki.konuTr = "a".repeat(601);
+        assertTrue(d.dogrula(iki, KAYNAK).stream().anyMatch(x -> x.alan().equals("Konu") && x.mesaj().contains("/ 600")));
+
+        // Aynı işleme ait belgeler (tek grup, analize 3 belge verilmiş): yine 600
+        FormVerisi ayni = gecerliForm();
+        ayni.ayniIslem = true;
+        ayni.belgeSayisi = 3;
+        ayni.konuTr = "a".repeat(550);
+        assertTrue(d.dogrula(ayni, KAYNAK).stream().noneMatch(x -> x.alan().equals("Konu")));
+    }
+
+    @Test
     void grupSirketiYoksaUyari() {
         FormVerisi f = gecerliForm();
         f.sozlesmeler.get(0).taraflar.remove(0);
