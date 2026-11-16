@@ -77,6 +77,7 @@ public class AnaPencere extends JFrame {
         super("YÖBF Otomatörü");
         this.y = y;
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setIconImages(Ikonlar.liste());
         setJMenuBar(menu());
         setLayout(new BorderLayout(6, 6));
 

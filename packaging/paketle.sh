@@ -53,7 +53,9 @@ JP_ARGS=(--type app-image
          --java-options "-Dfile.encoding=UTF-8"
          --java-options "-Dsun.jnu.encoding=UTF-8"
          --dest dist)
-if [[ -f packaging/yobf.ico && "$OS" == "windows" ]]; then JP_ARGS+=(--icon packaging/yobf.ico); fi
+# Uygulama simgesi (.exe / görev çubuğu)
+if [[ "$OS" == "windows" && -f packaging/yobf.ico ]]; then JP_ARGS+=(--icon packaging/yobf.ico); fi
+if [[ "$OS" == "linux" && -f packaging/yobf.png ]]; then JP_ARGS+=(--icon packaging/yobf.png); fi
 jpackage "${JP_ARGS[@]}"
 
 # Düzenlenebilir dosyalar .exe'nin yanına (derleme dışı): config/, prompts/, assets/
